@@ -1,4 +1,9 @@
 <resources>
     <string name="app_name">pos_app</string>
     <string name="print_receipt">Print Receipt</string>
+    <string name="safaribid_pos">SafariBid POS</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="login">Login</string>
+    <string name="logout">Logout</string>
 </resources>

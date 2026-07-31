@@ -1,134 +1,77 @@
 package com.example.pos_app;
 
-import android.content.ComponentName;
-import android.content.Context;
 import android.content.Intent;
-import android.content.ServiceConnection;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Color;
-import android.graphics.Paint;
 import android.os.Bundle;
-import android.os.IBinder;
-import android.os.RemoteException;
 import android.widget.Button;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.android.sdk.api.ISdkServiceManager;
-import com.android.sdk.api.constant.ServiceID;
-import com.android.sdk.api.printer.IPrinterBinderService;
-import com.android.sdk.api.printer.IPrinterCallback;
-import com.example.pos_app.utils.PrintUtil;
+import com.example.pos_app.auth.AuthManager;
+import com.example.pos_app.auth.LoginActivity;
+import com.example.pos_app.network.SocketManager;
 
 public class MainActivity extends AppCompatActivity {
 
     private TextView tvStatus;
-    private Button btnPrint;
-    private IPrinterBinderService printerService;
-
-    private ServiceConnection serviceConnection = new ServiceConnection() {
-        @Override
-        public void onServiceConnected(ComponentName name, IBinder service) {
-            try {
-                ISdkServiceManager manager = ISdkServiceManager.Stub.asInterface(service);
-                printerService = (IPrinterBinderService) manager.getService(ServiceID.SERVICE_ID_PRINTER);
-                tvStatus.setText(" Printer Connected Successfully!\nTap button to print 'Hello World'.");
-            } catch (Exception e) {
-                tvStatus.setText("Binding error: " + e.getMessage());
-            }
-        }
-
-        @Override
-        public void onServiceDisconnected(ComponentName name) {
-            printerService = null;
-        }
-    };
+    private Button btnLogout;
+    private AuthManager authManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        tvStatus = findViewById(R.id.tv_status);
-        btnPrint = findViewById(R.id.btn_print);
+        authManager = new AuthManager(this);
 
-        tvStatus.setText("Connecting to Printer Service...");
-
-        bindPrinterService();
-
-        btnPrint.setOnClickListener(v -> printHelloReceipt());
-    }
-
-    private void bindPrinterService() {
-        try {
-            Intent intent = new Intent();
-            intent.setAction("com.android.sdk.service");
-            intent.setPackage("com.android.sdk.service");
-            bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE);
-        } catch (Exception e) {
-            tvStatus.setText("Failed to bind: " + e.getMessage());
-        }
-    }
-
-    private void printHelloReceipt() {
-        if (printerService == null) {
-            Toast.makeText(this, "Printer not connected yet.", Toast.LENGTH_SHORT).show();
+        // Safety check – if not logged in, go back to Login
+        if (!authManager.isLoggedIn()) {
+            goToLogin();
             return;
         }
 
-        try {
-            Bitmap receipt = createReceiptBitmap();
-            byte[] printData = PrintUtil.getBitmapData(receipt);
+        tvStatus = findViewById(R.id.tv_status);
+        btnLogout = findViewById(R.id.btn_logout);
 
-            printerService.printBitmap(0, printData, 0, 0, new IPrinterCallback.Stub() {
-                @Override
-                public void onResult(int resultCode, String message, int extra) throws RemoteException {
-                    runOnUiThread(() ->
-                            Toast.makeText(MainActivity.this, "Print: " + resultCode + " - " + message, Toast.LENGTH_LONG).show());
-                }
-            });
-        } catch (Exception e) {
-            Toast.makeText(this, "Print error: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        String email = authManager.getEmail();
+        if (email != null && !email.isEmpty()) {
+            tvStatus.setText("Welcome to SafariBid POS\nLogged in as: " + email);
+        } else {
+            tvStatus.setText("Welcome to SafariBid POS\nYou are logged in.");
         }
+
+        // Connect socket with the real token
+        String token = authManager.getToken();
+        if (token != null && !token.isEmpty()) {
+            SocketManager.getInstance().connect(token);
+        }
+
+        btnLogout.setOnClickListener(v -> logout());
     }
 
-    private Bitmap createReceiptBitmap() {
-        int width = 384;
-        int height = 280;
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        canvas.drawColor(Color.WHITE);
+    private void logout() {
+        // Disconnect socket
+        SocketManager.getInstance().disconnect();
 
-        Paint paint = new Paint();
-        paint.setColor(Color.BLACK);
-        paint.setTextSize(28);
-        paint.setAntiAlias(true);
+        // Clear session
+        authManager.logout();
 
-        String[] lines = {
-                "Hello World",
-                "POS Receipt Demo",
-                "----------------",
-                "Thank you!",
-                "Date: " + new java.util.Date()
-        };
+        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
+        goToLogin();
+    }
 
-        int y = 40;
-        for (String line : lines) {
-            canvas.drawText(line, 30, y, paint);
-            y += 35;
-        }
-
-        return bitmap;
+    private void goToLogin() {
+        Intent intent = new Intent(MainActivity.this, LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (serviceConnection != null) {
-            unbindService(serviceConnection);
-        }
+        // Optional: disconnect socket when activity is destroyed
+        // SocketManager.getInstance().disconnect();
     }
 }
