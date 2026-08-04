@@ -6,4 +6,9 @@
     <string name="password">Password</string>
     <string name="login">Login</string>
     <string name="logout">Logout</string>
+    <string name="login_with_email">Login with Email</string>
+    <string name="login_with_phone">Login with Phone</string>
+    <string name="or">OR</string>
+    <string name="back">Back</string>
+    <string name="phone_2547_07_or_01">Phone (+2547..., 07... or 01...)</string>
 </resources>

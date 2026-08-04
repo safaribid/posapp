@@ -2,10 +2,11 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
+    id("com.google.gms.google-services")
 }
 
 android {
-    namespace = "com.example.pos_app"
+    namespace = "com.safaribid.pos"
     compileSdk {
         version = release(36) {
             minorApiLevel = 1
@@ -13,7 +14,7 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.example.pos_app"
+        applicationId = "com.safaribid.pos"
         minSdk = 24
         targetSdk = 36
         versionCode = 1
@@ -30,6 +31,7 @@ android {
         buildConfigField("String", "SUPABASE_URL", "\"${localProperties.getProperty("SUPABASE_URL") ?: ""}\"")
         buildConfigField("String", "SUPABASE_PUB_KEY", "\"${localProperties.getProperty("SUPABASE_PUB_KEY") ?: ""}\"")
         buildConfigField("String", "SERVER_API", "\"${localProperties.getProperty("SERVER_API") ?: ""}\"")
+        buildConfigField("String", "GOOGLE_WEB_CLIENT_ID", "\"${localProperties.getProperty("GOOGLE_WEB_CLIENT_ID") ?: ""}\"")
     }
 
     buildTypes {
@@ -63,6 +65,14 @@ dependencies {
     implementation("io.github.jan-tennert.supabase:postgrest-kt:2.6.1")
     implementation("io.github.jan-tennert.supabase:gotrue-kt:2.6.1")
     implementation("io.github.jan-tennert.supabase:realtime-kt:2.6.1")
+
+    //Google Sign-in
+    implementation("com.google.android.gms:play-services-auth:21.2.0")
+
+    // Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.17.0"))
+    implementation("com.google.firebase:firebase-messaging")
+    implementation("com.google.firebase:firebase-analytics")
 
 // Networking
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
