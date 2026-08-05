@@ -10,21 +10,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import androidx.activity.result.ActivityResultLauncher;
-import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.safaribid.pos.MainActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.network.SocketManager;
-import com.safaribid.pos.utils.AppConfig;
-import com.google.android.gms.auth.api.signin.GoogleSignIn;
-import com.google.android.gms.auth.api.signin.GoogleSignInAccount;
-import com.google.android.gms.auth.api.signin.GoogleSignInClient;
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions;
-import com.google.android.gms.common.SignInButton;
-import com.google.android.gms.common.api.ApiException;
-import com.google.android.gms.tasks.Task;
 import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONObject;
@@ -46,18 +36,17 @@ public class LoginActivity extends AppCompatActivity {
     private Button btnLoginPhone;
     private Button btnBackFromEmail;
     private Button btnBackFromPhone;
-    private SignInButton btnGoogle;
 
     private ProgressBar progressBar;
     private TextView tvError;
 
     private AuthManager authManager;
-    private GoogleSignInClient googleSignInClient;
 
     private final AuthManager.AuthCallback authCallback = new AuthManager.AuthCallback() {
         @Override
         public void onSuccess(JSONObject userData) {
             setLoading(false);
+            android.util.Log.d("LoginActivity", "User Data: " + userData.toString());
             String name = userData.optString("fname", "User");
             Toast.makeText(LoginActivity.this, "Welcome back " + name, Toast.LENGTH_SHORT).show();
             SocketManager.getInstance().connect(userData.optString("id", ""));
@@ -70,31 +59,6 @@ public class LoginActivity extends AppCompatActivity {
             showError(message);
         }
     };
-
-    private final ActivityResultLauncher<Intent> googleSignInLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getData() == null) {
-                    setLoading(false);
-                    showError("Google sign-in cancelled");
-                    return;
-                }
-
-                Task<GoogleSignInAccount> task = GoogleSignIn.getSignedInAccountFromIntent(result.getData());
-                try {
-                    GoogleSignInAccount account = task.getResult(ApiException.class);
-                    String idToken = account.getIdToken();
-
-                    if (idToken != null && !idToken.isEmpty()) {
-                        authManager.loginWithGoogle(idToken, authCallback);
-                    } else {
-                        setLoading(false);
-                        showError("Failed to get Google ID token");
-                    }
-                } catch (ApiException e) {
-                    setLoading(false);
-                    showError("Google sign-in failed: " + e.getMessage());
-                }
-            });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -126,17 +90,9 @@ public class LoginActivity extends AppCompatActivity {
         btnLoginPhone = findViewById(R.id.btnLoginPhone);
         btnBackFromEmail = findViewById(R.id.btnBackFromEmail);
         btnBackFromPhone = findViewById(R.id.btnBackFromPhone);
-        btnGoogle = findViewById(R.id.btnGoogle);
 
         progressBar = findViewById(R.id.progressBar);
         tvError = findViewById(R.id.tvError);
-
-        // Google setup
-        GoogleSignInOptions gso = new GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-                .requestIdToken(AppConfig.GOOGLE_WEB_CLIENT_ID)
-                .requestEmail()
-                .build();
-        googleSignInClient = GoogleSignIn.getClient(this, gso);
 
         // Click listeners
         btnShowEmail.setOnClickListener(v -> showEmailForm());
@@ -146,7 +102,6 @@ public class LoginActivity extends AppCompatActivity {
 
         btnLoginEmail.setOnClickListener(v -> attemptEmailLogin());
         btnLoginPhone.setOnClickListener(v -> attemptPhoneLogin());
-        btnGoogle.setOnClickListener(v -> signInWithGoogle());
     }
 
     private void showChoices() {
@@ -208,13 +163,6 @@ public class LoginActivity extends AppCompatActivity {
         authManager.loginWithPhone(phone, password, authCallback);
     }
 
-    private void signInWithGoogle() {
-        tvError.setVisibility(View.GONE);
-        setLoading(true);
-        Intent signInIntent = googleSignInClient.getSignInIntent();
-        googleSignInLauncher.launch(signInIntent);
-    }
-
     private String getText(TextInputEditText editText) {
         return editText.getText() != null ? editText.getText().toString().trim() : "";
     }
@@ -223,7 +171,6 @@ public class LoginActivity extends AppCompatActivity {
         progressBar.setVisibility(loading ? View.VISIBLE : View.GONE);
         btnLoginEmail.setEnabled(!loading);
         btnLoginPhone.setEnabled(!loading);
-        btnGoogle.setEnabled(!loading);
         btnShowEmail.setEnabled(!loading);
         btnShowPhone.setEnabled(!loading);
     }

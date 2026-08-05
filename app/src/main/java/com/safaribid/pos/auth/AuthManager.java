@@ -91,23 +91,6 @@ public class AuthManager {
         });
     }
 
-    // ========== GOOGLE ==========
-    public void loginWithGoogle(String idToken, AuthCallback callback) {
-        getFirebaseToken(firebaseToken -> {
-            JSONObject body = new JSONObject();
-            try {
-                body.put("id_token", idToken);
-                if (firebaseToken != null) {
-                    body.put("firebaseToken", firebaseToken);
-                }
-            } catch (Exception e) {
-                callback.onError("Invalid request");
-                return;
-            }
-            performLogin("/auth/signin-google", body, callback);
-        });
-    }
-
     /**
      * Accepts:
      * - +2547xxxxxxxx
@@ -194,8 +177,11 @@ public class AuthManager {
         FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null) {
-                        callback.onToken(task.getResult());
+                        String token = task.getResult();
+                        Log.d(TAG, "Firebase Token: " + token);
+                        callback.onToken(token);
                     } else {
+                        Log.e(TAG, "Fetching FCM registration token failed", task.getException());
                         callback.onToken(null);
                     }
                 });
