@@ -2,12 +2,12 @@ package com.safaribid.pos.network;
 
 import com.safaribid.pos.utils.AppConfig;
 
+import java.util.concurrent.TimeUnit;
+
 import okhttp3.OkHttpClient;
 import okhttp3.logging.HttpLoggingInterceptor;
 import retrofit2.Retrofit;
 import retrofit2.converter.gson.GsonConverterFactory;
-
-import java.util.concurrent.TimeUnit;
 
 public class ApiClient {
 
@@ -25,12 +25,21 @@ public class ApiClient {
                     .writeTimeout(30, TimeUnit.SECONDS)
                     .build();
 
+            String baseUrl = AppConfig.SERVER_API;
+            if (!baseUrl.endsWith("/")) {
+                baseUrl = baseUrl + "/";
+            }
+
             retrofit = new Retrofit.Builder()
-                    .baseUrl(AppConfig.SERVER_API.endsWith("/") ? AppConfig.SERVER_API : AppConfig.SERVER_API + "/")
+                    .baseUrl(baseUrl)
                     .client(client)
                     .addConverterFactory(GsonConverterFactory.create())
                     .build();
         }
         return retrofit;
+    }
+
+    public static ApiService getApiService() {
+        return getClient().create(ApiService.class);
     }
 }

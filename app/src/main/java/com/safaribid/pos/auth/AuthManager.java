@@ -24,10 +24,13 @@ public class AuthManager {
 
     private static final String TAG = "AuthManager";
     private static final String PREF_NAME = "pos_auth_prefs";
+
     private static final String KEY_USER_JSON = "user_json";
     private static final String KEY_USER_ID = "user_id";
     private static final String KEY_EMAIL = "email";
     private static final String KEY_FNAME = "fname";
+    private static final String KEY_ACCESS_TOKEN = "access_token";
+    private static final String KEY_REFRESH_TOKEN = "refresh_token";
 
     private final SharedPreferences prefs;
     private final OkHttpClient client;
@@ -62,7 +65,7 @@ public class AuthManager {
                 callback.onError("Invalid request");
                 return;
             }
-            performLogin("/auth/signin-email", body, callback);
+            performApiLogin("/auth/signin-email", body, email, password, callback);
         });
     }
 
@@ -87,40 +90,19 @@ public class AuthManager {
                 callback.onError("Invalid request");
                 return;
             }
-            performLogin("/auth/signin-phone", body, callback);
+            // For phone we still need email or phone for Supabase step.
+            // We pass the normalized phone; Supabase phone login uses the phone field.
+            performApiLogin("/auth/signin-phone", body, normalizedPhone, password, callback, true);
         });
     }
 
-    /**
-     * Accepts:
-     * - +2547xxxxxxxx
-     * - 07xxxxxxxx
-     * - 01xxxxxxxx
-     * Returns normalized +254... or null if invalid
-     */
-    private String normalizeKenyanPhone(String phone) {
-        if (phone == null) return null;
-
-        // Remove spaces, dashes, brackets
-        String cleaned = phone.replaceAll("[\\s\\-()]", "");
-
-        if (cleaned.startsWith("+254") && cleaned.length() == 13) {
-            return cleaned;
-        }
-
-        if (cleaned.startsWith("0") && cleaned.length() == 10) {
-            // 07xxxxxxxx or 01xxxxxxxx → +2547... / +2541...
-            return "+254" + cleaned.substring(1);
-        }
-
-        if (cleaned.startsWith("254") && cleaned.length() == 12) {
-            return "+" + cleaned;
-        }
-
-        return null;
+    private void performApiLogin(String endpoint, JSONObject body, String identifier,
+                                 String password, AuthCallback callback) {
+        performApiLogin(endpoint, body, identifier, password, callback, false);
     }
 
-    private void performLogin(String endpoint, JSONObject body, AuthCallback callback) {
+    private void performApiLogin(String endpoint, JSONObject body, String identifier,
+                                 String password, AuthCallback callback, boolean isPhone) {
         executor.execute(() -> {
             try {
                 RequestBody requestBody = RequestBody.create(
@@ -143,7 +125,7 @@ public class AuthManager {
 
                 try (Response response = client.newCall(request).execute()) {
                     String responseBody = response.body() != null ? response.body().string() : "";
-                    Log.d(TAG, "Login response: " + responseBody);
+                    Log.d(TAG, "API Login response: " + responseBody);
 
                     JSONObject json = new JSONObject(responseBody);
                     boolean success = json.optBoolean("success", false);
@@ -151,8 +133,8 @@ public class AuthManager {
                     if (response.isSuccessful() && success) {
                         JSONObject userData = json.optJSONObject("data");
                         if (userData != null) {
-                            saveUser(userData);
-                            mainHandler.post(() -> callback.onSuccess(userData));
+                            // Step 2: Get Supabase session token
+                            obtainSupabaseSession(identifier, password, isPhone, userData, callback);
                         } else {
                             mainHandler.post(() -> callback.onError("No user data received"));
                         }
@@ -167,21 +149,91 @@ public class AuthManager {
                     }
                 }
             } catch (Exception e) {
-                Log.e(TAG, "Login error", e);
+                Log.e(TAG, "API Login error", e);
                 mainHandler.post(() -> callback.onError("Login failed: " + e.getMessage()));
             }
         });
+    }
+
+    /**
+     * Step 2: Sign in directly to Supabase to obtain the session token.
+     * This token is required as Bearer token for all subsequent API calls.
+     */
+    private void obtainSupabaseSession(String identifier, String password, boolean isPhone,
+                                       JSONObject userData, AuthCallback callback) {
+        try {
+            JSONObject body = new JSONObject();
+            if (isPhone) {
+                body.put("phone", identifier);
+            } else {
+                body.put("email", identifier);
+            }
+            body.put("password", password);
+
+            RequestBody requestBody = RequestBody.create(
+                    body.toString(),
+                    MediaType.parse("application/json")
+            );
+
+            String url = AppConfig.SUPABASE_URL + "/auth/v1/token?grant_type=password";
+
+            Request request = new Request.Builder()
+                    .url(url)
+                    .addHeader("apikey", AppConfig.SUPABASE_KEY)
+                    .addHeader("Content-Type", "application/json")
+                    .post(requestBody)
+                    .build();
+
+            try (Response response = client.newCall(request).execute()) {
+                String responseBody = response.body() != null ? response.body().string() : "";
+                Log.d(TAG, "Supabase session response: " + responseBody);
+
+                if (response.isSuccessful()) {
+                    JSONObject json = new JSONObject(responseBody);
+                    String accessToken = json.optString("access_token", "");
+                    String refreshToken = json.optString("refresh_token", "");
+
+                    if (accessToken.isEmpty()) {
+                        mainHandler.post(() -> callback.onError("Failed to obtain session token"));
+                        return;
+                    }
+
+                    // Save both user data and session tokens
+                    saveSession(userData, accessToken, refreshToken);
+                    mainHandler.post(() -> callback.onSuccess(userData));
+                } else {
+                    mainHandler.post(() -> callback.onError("Failed to get Supabase session token"));
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Supabase session error", e);
+            mainHandler.post(() -> callback.onError("Session error: " + e.getMessage()));
+        }
+    }
+
+    private String normalizeKenyanPhone(String phone) {
+        if (phone == null) return null;
+
+        String cleaned = phone.replaceAll("[\\s\\-()]", "");
+
+        if (cleaned.startsWith("+254") && cleaned.length() == 13) {
+            return cleaned;
+        }
+        if (cleaned.startsWith("0") && cleaned.length() == 10) {
+            return "+254" + cleaned.substring(1);
+        }
+        if (cleaned.startsWith("254") && cleaned.length() == 12) {
+            return "+" + cleaned;
+        }
+        return null;
     }
 
     private void getFirebaseToken(FirebaseTokenCallback callback) {
         FirebaseMessaging.getInstance().getToken()
                 .addOnCompleteListener(task -> {
                     if (task.isSuccessful() && task.getResult() != null) {
-                        String token = task.getResult();
-                        Log.d(TAG, "Firebase Token: " + token);
-                        callback.onToken(token);
+                        callback.onToken(task.getResult());
                     } else {
-                        Log.e(TAG, "Fetching FCM registration token failed", task.getException());
                         callback.onToken(null);
                     }
                 });
@@ -191,16 +243,18 @@ public class AuthManager {
         void onToken(String token);
     }
 
-    private void saveUser(JSONObject userData) {
+    private void saveSession(JSONObject userData, String accessToken, String refreshToken) {
         try {
             prefs.edit()
                     .putString(KEY_USER_JSON, userData.toString())
                     .putString(KEY_USER_ID, userData.optString("id", ""))
                     .putString(KEY_EMAIL, userData.optString("email", ""))
                     .putString(KEY_FNAME, userData.optString("fname", ""))
+                    .putString(KEY_ACCESS_TOKEN, accessToken)
+                    .putString(KEY_REFRESH_TOKEN, refreshToken)
                     .apply();
         } catch (Exception e) {
-            Log.e(TAG, "Failed to save user", e);
+            Log.e(TAG, "Failed to save session", e);
         }
     }
 
@@ -209,8 +263,18 @@ public class AuthManager {
     }
 
     public boolean isLoggedIn() {
+        String token = getAccessToken();
         String userJson = prefs.getString(KEY_USER_JSON, null);
-        return userJson != null && !userJson.isEmpty();
+        return token != null && !token.isEmpty() && userJson != null && !userJson.isEmpty();
+    }
+
+    public String getAccessToken() {
+        return prefs.getString(KEY_ACCESS_TOKEN, null);
+    }
+
+    public String getBearerToken() {
+        String token = getAccessToken();
+        return token != null ? "Bearer " + token : null;
     }
 
     public String getUserId() {

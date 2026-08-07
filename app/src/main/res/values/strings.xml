@@ -11,4 +11,10 @@
     <string name="or">OR</string>
     <string name="back">Back</string>
     <string name="phone_2547_07_or_01">Phone (+2547..., 07... or 01...)</string>
+    <string name="orders">Orders</string>
+    <string name="ord_001">ORD-001</string>
+    <string name="pending">Pending</string>
+    <string name="customer_name">Customer Name</string>
+    <string name="kes_0_00">KES 0.00</string>
+    <string name="no_orders_yet">No orders yet</string>
 </resources>
