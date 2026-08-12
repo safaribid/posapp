@@ -43,6 +43,11 @@ public class AuthManager {
         void onError(String message);
     }
 
+    public interface TokenCallback {
+        void onToken(String accessToken);
+        void onError(String message);
+    }
+
     public AuthManager(Context context) {
         this.context = context.getApplicationContext();
         prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE);
@@ -65,7 +70,7 @@ public class AuthManager {
                 callback.onError("Invalid request");
                 return;
             }
-            performApiLogin("/auth/signin-email", body, email, password, callback);
+            performApiLogin("/auth/signin-email", body, email, password, callback, false);
         });
     }
 
@@ -90,15 +95,8 @@ public class AuthManager {
                 callback.onError("Invalid request");
                 return;
             }
-            // For phone we still need email or phone for Supabase step.
-            // We pass the normalized phone; Supabase phone login uses the phone field.
             performApiLogin("/auth/signin-phone", body, normalizedPhone, password, callback, true);
         });
-    }
-
-    private void performApiLogin(String endpoint, JSONObject body, String identifier,
-                                 String password, AuthCallback callback) {
-        performApiLogin(endpoint, body, identifier, password, callback, false);
     }
 
     private void performApiLogin(String endpoint, JSONObject body, String identifier,
@@ -133,7 +131,6 @@ public class AuthManager {
                     if (response.isSuccessful() && success) {
                         JSONObject userData = json.optJSONObject("data");
                         if (userData != null) {
-                            // Step 2: Get Supabase session token
                             obtainSupabaseSession(identifier, password, isPhone, userData, callback);
                         } else {
                             mainHandler.post(() -> callback.onError("No user data received"));
@@ -155,10 +152,6 @@ public class AuthManager {
         });
     }
 
-    /**
-     * Step 2: Sign in directly to Supabase to obtain the session token.
-     * This token is required as Bearer token for all subsequent API calls.
-     */
     private void obtainSupabaseSession(String identifier, String password, boolean isPhone,
                                        JSONObject userData, AuthCallback callback) {
         try {
@@ -198,7 +191,6 @@ public class AuthManager {
                         return;
                     }
 
-                    // Save both user data and session tokens
                     saveSession(userData, accessToken, refreshToken);
                     mainHandler.post(() -> callback.onSuccess(userData));
                 } else {
@@ -209,6 +201,71 @@ public class AuthManager {
             Log.e(TAG, "Supabase session error", e);
             mainHandler.post(() -> callback.onError("Session error: " + e.getMessage()));
         }
+    }
+
+    /**
+     * Refresh access token using stored refresh token.
+     * Call this when API returns 401.
+     */
+    public void refreshAccessToken(TokenCallback callback) {
+        String refreshToken = getRefreshToken();
+        if (refreshToken == null || refreshToken.isEmpty()) {
+            Log.w(TAG, "No refresh token available");
+            // Do NOT show this on screen during normal app use
+            mainHandler.post(() -> callback.onError("Session expired. Please login again."));
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                JSONObject body = new JSONObject();
+                body.put("refresh_token", refreshToken);
+
+                RequestBody requestBody = RequestBody.create(
+                        body.toString(),
+                        MediaType.parse("application/json")
+                );
+
+                String url = AppConfig.SUPABASE_URL + "/auth/v1/token?grant_type=refresh_token";
+
+                Request request = new Request.Builder()
+                        .url(url)
+                        .addHeader("apikey", AppConfig.SUPABASE_KEY)
+                        .addHeader("Content-Type", "application/json")
+                        .post(requestBody)
+                        .build();
+
+                try (Response response = client.newCall(request).execute()) {
+                    String responseBody = response.body() != null ? response.body().string() : "";
+                    Log.d(TAG, "Refresh token response: " + responseBody);
+
+                    if (response.isSuccessful()) {
+                        JSONObject json = new JSONObject(responseBody);
+                        String accessToken = json.optString("access_token", "");
+                        String newRefreshToken = json.optString("refresh_token", refreshToken);
+
+                        if (accessToken.isEmpty()) {
+                            mainHandler.post(() -> callback.onError("Empty access token on refresh"));
+                            return;
+                        }
+
+                        prefs.edit()
+                                .putString(KEY_ACCESS_TOKEN, accessToken)
+                                .putString(KEY_REFRESH_TOKEN, newRefreshToken)
+                                .apply();
+
+                        mainHandler.post(() -> callback.onToken(accessToken));
+                    } else {
+                        // Refresh failed → force logout
+                        logout();
+                        mainHandler.post(() -> callback.onError("Session expired. Please login again."));
+                    }
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Refresh error", e);
+                mainHandler.post(() -> callback.onError("Refresh failed: " + e.getMessage()));
+            }
+        });
     }
 
     private String normalizeKenyanPhone(String phone) {
@@ -270,6 +327,10 @@ public class AuthManager {
 
     public String getAccessToken() {
         return prefs.getString(KEY_ACCESS_TOKEN, null);
+    }
+
+    public String getRefreshToken() {
+        return prefs.getString(KEY_REFRESH_TOKEN, null);
     }
 
     public String getBearerToken() {

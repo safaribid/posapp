@@ -97,11 +97,14 @@ public class Order {
     public String getStatusLabel() {
         switch (status) {
             case 1: return "Pending";
-            case 2: return "Confirmed";
-            case 3: return "In Progress";
-            case 4: return "Ready for Pickup";
-            case 5: return "Completed";
-            case 6: return "Cancelled";
+            case 2: return "New Order";
+            case 3: return "Confirmed";
+            case 4: return "Preparing";
+            case 5: return "Ready for Pickup";
+            case 6: return "Driver on the way";
+            case 7: return "Driver is here";
+            case 9:
+            case 10: return "Rejected";
             default: return "Status " + status;
         }
     }
