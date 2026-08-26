@@ -16,30 +16,31 @@ import com.android.sdk.api.printer.IPrinterBinderService;
 import com.android.sdk.api.printer.IPrinterCallback;
 import com.safaribid.pos.utils.PrintUtil;
 
-public class PrinterHelper {
+public class Sm1PrinterHelper implements IPrinter {
 
-    private static final String TAG = "PrinterHelper";
-
-    public interface PrintCallback {
-        void onSuccess();
-        void onError(String message);
-    }
+    private static final String TAG = "Sm1PrinterHelper";
 
     private final Context context;
     private IPrinterBinderService printerService;
     private boolean bound = false;
+
     private PrintCallback pendingCallback;
     private byte[] pendingData;
+    private ConnectionCallback pendingConnectionCallback;
 
     private final ServiceConnection connection = new ServiceConnection() {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
             try {
                 ISdkServiceManager manager = ISdkServiceManager.Stub.asInterface(service);
-                // Use the same ServiceID approach that worked in your earlier demo
                 Object binder = manager.getService(ServiceID.SERVICE_ID_PRINTER);
                 printerService = (IPrinterBinderService) binder;
                 bound = true;
+
+                if (pendingConnectionCallback != null) {
+                    pendingConnectionCallback.onConnected();
+                    pendingConnectionCallback = null;
+                }
 
                 if (pendingData != null) {
                     doPrint(pendingData, pendingCallback);
@@ -48,6 +49,10 @@ public class PrinterHelper {
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Printer bind error", e);
+                if (pendingConnectionCallback != null) {
+                    pendingConnectionCallback.onConnectionFailed("Printer bind failed: " + e.getMessage());
+                    pendingConnectionCallback = null;
+                }
                 if (pendingCallback != null) {
                     pendingCallback.onError("Printer bind failed: " + e.getMessage());
                     pendingCallback = null;
@@ -62,36 +67,40 @@ public class PrinterHelper {
         }
     };
 
-    public PrinterHelper(Context context) {
+    public Sm1PrinterHelper(Context context) {
         this.context = context.getApplicationContext();
     }
 
-    public void bind() {
-        try {
-            Intent intent = new Intent();
-            // Keep the same action/package your SM1 services use
-            intent.setAction("com.android.sdk.api.SdkService");
-            intent.setPackage("com.android.sdk");
-            context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
-        } catch (Exception e) {
-            Log.e(TAG, "bindService failed", e);
+    @Override
+    public void connect(ConnectionCallback callback) {
+        if (bound && printerService != null) {
+            if (callback != null) callback.onConnected();
+            return;
         }
+        pendingConnectionCallback = callback;
+        bind();
     }
 
-    public void unbind() {
-        if (bound) {
-            try {
-                context.unbindService(connection);
-            } catch (Exception ignored) {
-            }
-            bound = false;
-            printerService = null;
-        }
+    @Override
+    public void connect(String macAddress, ConnectionCallback callback) {
+        // SM1 ignores MAC
+        connect(callback);
     }
 
+    @Override
+    public boolean isConnected() {
+        return bound && printerService != null;
+    }
+
+    @Override
+    public void disconnect() {
+        unbind();
+    }
+
+    @Override
     public void printBitmap(Bitmap bitmap, PrintCallback callback) {
         if (bitmap == null) {
-            callback.onError("Receipt image is empty");
+            if (callback != null) callback.onError("Receipt image is empty");
             return;
         }
 
@@ -108,14 +117,38 @@ public class PrinterHelper {
 
             doPrint(data, callback);
         } catch (Exception e) {
-            callback.onError("Print prepare failed: " + e.getMessage());
+            if (callback != null) callback.onError("Print prepare failed: " + e.getMessage());
+        }
+    }
+
+    private void bind() {
+        try {
+            Intent intent = new Intent();
+            intent.setAction("com.android.sdk.api.SdkService");
+            intent.setPackage("com.android.sdk");
+            context.bindService(intent, connection, Context.BIND_AUTO_CREATE);
+        } catch (Exception e) {
+            Log.e(TAG, "bindService failed", e);
+            if (pendingConnectionCallback != null) {
+                pendingConnectionCallback.onConnectionFailed("bindService failed: " + e.getMessage());
+                pendingConnectionCallback = null;
+            }
+        }
+    }
+
+    private void unbind() {
+        if (bound) {
+            try {
+                context.unbindService(connection);
+            } catch (Exception ignored) {
+            }
+            bound = false;
+            printerService = null;
         }
     }
 
     private void doPrint(byte[] data, PrintCallback callback) {
         try {
-            // Signature used earlier in your project:
-            // printBitmap(int, byte[], int, int, IPrinterCallback)
             printerService.printBitmap(0, data, 0, 0, new IPrinterCallback.Stub() {
                 @Override
                 public void onResult(int resultCode, String message, int extra) throws RemoteException {

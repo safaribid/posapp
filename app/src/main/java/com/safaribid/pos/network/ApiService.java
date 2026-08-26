@@ -25,4 +25,10 @@ public interface ApiService {
             @Header("Authorization") String bearerToken,
             @Body Map<String, Object> body
     );
+
+    @GET("orders/detail")
+    Call<com.safaribid.pos.models.Order> getOrderById(
+            @Header("Authorization") String bearerToken,
+            @Query("id") String orderId
+    );
 }
