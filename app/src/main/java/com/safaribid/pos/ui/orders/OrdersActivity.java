@@ -10,14 +10,18 @@ import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageButton;
 import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.view.GravityCompat;
+import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 import com.safaribid.pos.R;
@@ -50,6 +54,9 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private TextInputEditText etSearch;
 
     private Button btnFilterAll, btnFilterActive, btnFilterUnfulfilled, btnFilterPartial;
+    private DrawerLayout drawerLayout;
+    private NavigationView navigationView;
+    private ImageButton btnMenu, btnNotifications;
 
     private OrderAdapter adapter;
     private AuthManager authManager;
@@ -70,6 +77,8 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
             return;
         }
 
+        drawerLayout = findViewById(R.id.drawerLayout);
+        navigationView = findViewById(R.id.navigationView);
         recyclerView = findViewById(R.id.recyclerOrders);
         shimmerLayout = findViewById(R.id.shimmerLayout);
         tvEmpty = findViewById(R.id.tvEmpty);
@@ -80,6 +89,50 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         btnFilterActive = findViewById(R.id.btnFilterActive);
         btnFilterUnfulfilled = findViewById(R.id.btnFilterUnfulfilled);
         btnFilterPartial = findViewById(R.id.btnFilterPartial);
+
+        btnMenu = findViewById(R.id.btnMenu);
+        btnNotifications = findViewById(R.id.btnNotifications);
+
+        // Header user name
+        View header = navigationView.getHeaderView(0);
+        TextView tvNavUser = header.findViewById(R.id.tvNavUser);
+        String firstName = authManager.getFirstName();
+        String email = authManager.getEmail();
+        if (firstName != null && !firstName.isEmpty()) {
+            tvNavUser.setText(firstName);
+        } else if (email != null && !email.isEmpty()) {
+            tvNavUser.setText(email);
+        } else {
+            tvNavUser.setText("User");
+        }
+
+        // Open drawer
+        btnMenu.setOnClickListener(v -> drawerLayout.openDrawer(GravityCompat.START));
+
+        // Notifications placeholder
+        btnNotifications.setOnClickListener(v ->
+                Toast.makeText(this, "No new notifications", Toast.LENGTH_SHORT).show());
+
+        // Drawer item clicks
+        navigationView.setNavigationItemSelectedListener(item -> {
+            int id = item.getItemId();
+            drawerLayout.closeDrawer(GravityCompat.START);
+
+            if (id == R.id.nav_orders) {
+                // Already on Orders
+                return true;
+            } else if (id == R.id.nav_printer) {
+                startActivity(new Intent(this, com.safaribid.pos.printer.PrinterPickerActivity.class));
+                return true;
+            } else if (id == R.id.nav_logout) {
+                logout();
+                return true;
+            }
+            return false;
+        });
+
+        // Mark Orders as selected
+        navigationView.setCheckedItem(R.id.nav_orders);
 
         adapter = new OrderAdapter(new OrderAdapter.OnOrderActionListener() {
             @Override
@@ -388,6 +441,25 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         Intent intent = new Intent(OrdersActivity.this, OrderDetailActivity.class);
         intent.putExtra(OrderDetailActivity.EXTRA_ORDER_JSON, new Gson().toJson(order));
         startActivity(intent);
+    }
+
+    @Override
+    public void onBackPressed() {
+        if (drawerLayout.isDrawerOpen(GravityCompat.START)) {
+            drawerLayout.closeDrawer(GravityCompat.START);
+        } else {
+            super.onBackPressed();
+        }
+    }
+
+    private void logout() {
+        SocketManager.getInstance().disconnect();
+        authManager.logout();
+        Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
+        Intent intent = new Intent(this, com.safaribid.pos.auth.LoginActivity.class);
+        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        startActivity(intent);
+        finish();
     }
 
     @Override

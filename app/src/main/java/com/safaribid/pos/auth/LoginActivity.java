@@ -12,7 +12,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.safaribid.pos.MainActivity;
+import com.safaribid.pos.ui.orders.OrdersActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.network.SocketManager;
 import com.google.android.material.textfield.TextInputEditText;
@@ -50,7 +50,7 @@ public class LoginActivity extends AppCompatActivity {
             String name = userData.optString("fname", "User");
             Toast.makeText(LoginActivity.this, "Welcome back " + name, Toast.LENGTH_SHORT).show();
             SocketManager.getInstance().connect(userData.optString("id", ""));
-            goToMain();
+            goToOrders();
         }
 
         @Override
@@ -68,7 +68,7 @@ public class LoginActivity extends AppCompatActivity {
         authManager = new AuthManager(this);
 
         if (authManager.isLoggedIn()) {
-            goToMain();
+            goToOrders();
             return;
         }
 
@@ -180,8 +180,8 @@ public class LoginActivity extends AppCompatActivity {
         tvError.setVisibility(View.VISIBLE);
     }
 
-    private void goToMain() {
-        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+    private void goToOrders() {
+        Intent intent = new Intent(LoginActivity.this, OrdersActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
