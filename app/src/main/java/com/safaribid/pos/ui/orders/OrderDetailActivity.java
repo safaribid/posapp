@@ -16,12 +16,12 @@ import android.widget.Toast;
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
-import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
+import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.models.Order;
@@ -54,37 +54,27 @@ public class OrderDetailActivity extends AppCompatActivity {
 
     private static final int REQ_BT_PERMISSIONS = 2001;
 
-    // Toolbar
     private Toolbar toolbar;
 
-    // Header card
     private TextView txtStatusChip, txtCreatedAt, txtTotalBig;
-
-    // Customer
     private TextView txtCustomerName, txtCustomerEmail, txtCustomerPhone;
-
-    // Items
     private LinearLayout layoutOrderItems;
     private TextView txtEmptyItems;
-
-    // Shipping
     private TextView txtShippingAddress, txtShippingDetails;
-
-    // Summary
     private TextView txtSubtotal, txtShippingCost, txtSummaryTotal, txtPaymentInfo, txtPaymentRef;
 
-    // Bottom buttons
-    private Button btnUpdateStatus, btnPrint, btnTrackOrder;
+    private Button btnPrimaryAction;
+    private Button btnPrint, btnTrackOrder;
 
     private ProgressBar progressBar;
 
-    // Data
     private Order currentOrder;
     private String orderId;
     private AuthManager authManager;
 
-    // Printer (SM1 + Bluetooth)
     private IPrinter printer;
+
+    private final Gson gson = new Gson();
 
     private final ActivityResultLauncher<Intent> printerPickerLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -112,7 +102,7 @@ public class OrderDetailActivity extends AppCompatActivity {
         String orderJson = getIntent().getStringExtra(EXTRA_ORDER_JSON);
         if (orderJson != null && !orderJson.isEmpty()) {
             try {
-                currentOrder = new com.google.gson.Gson().fromJson(orderJson, Order.class);
+                currentOrder = gson.fromJson(orderJson, Order.class);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -135,6 +125,7 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         if (currentOrder != null) {
             bindOrder(currentOrder);
+            updatePrimaryButton();
         } else {
             loadOrder(orderId);
         }
@@ -168,22 +159,23 @@ public class OrderDetailActivity extends AppCompatActivity {
         txtPaymentInfo = findViewById(R.id.txtPaymentInfo);
         txtPaymentRef = findViewById(R.id.txtPaymentRef);
 
-        btnUpdateStatus = findViewById(R.id.btnUpdateStatus);
+        btnPrimaryAction = findViewById(R.id.btnUpdateStatus);
         btnPrint = findViewById(R.id.btnPrint);
         btnTrackOrder = findViewById(R.id.btnTrackOrder);
-
         progressBar = findViewById(R.id.progressBar);
     }
 
     private void setupClickListeners() {
-        btnUpdateStatus.setOnClickListener(v -> showStatusPicker());
-        btnPrint.setOnClickListener(v -> onPrintClicked());
-        btnTrackOrder.setOnClickListener(v -> onTrackOrderClicked());
+        if (btnPrimaryAction != null) {
+            btnPrimaryAction.setOnClickListener(v -> onPrimaryActionClicked());
+        }
+        if (btnPrint != null) {
+            btnPrint.setOnClickListener(v -> onPrintClicked());
+        }
+        if (btnTrackOrder != null) {
+            btnTrackOrder.setOnClickListener(v -> onTrackOrderClicked());
+        }
     }
-
-    // ------------------------------------------------------------------
-    // Load order
-    // ------------------------------------------------------------------
 
     private void loadOrder(String id) {
         showLoading(true);
@@ -204,7 +196,9 @@ public class OrderDetailActivity extends AppCompatActivity {
                 showLoading(false);
                 if (response.isSuccessful() && response.body() != null) {
                     currentOrder = response.body();
+                    orderId = currentOrder.getId();
                     bindOrder(currentOrder);
+                    updatePrimaryButton();
                 } else {
                     Toast.makeText(OrderDetailActivity.this, "Failed to load order", Toast.LENGTH_LONG).show();
                 }
@@ -218,10 +212,6 @@ public class OrderDetailActivity extends AppCompatActivity {
         });
     }
 
-    // ------------------------------------------------------------------
-    // Bind UI (matches screenshot layout)
-    // ------------------------------------------------------------------
-
     private void bindOrder(Order order) {
         if (order == null) return;
 
@@ -229,36 +219,30 @@ public class OrderDetailActivity extends AppCompatActivity {
             getSupportActionBar().setTitle("Order #" + safe(order.getId()));
         }
 
-        // Status chip
         txtStatusChip.setText(order.getStatusLabel().toUpperCase(Locale.getDefault()));
-
-        // Date
         txtCreatedAt.setText(safe(order.getCreatedAt()));
-
-        // Big total
         txtTotalBig.setText(formatMoney(order.getTotalPrice()));
 
-        // Customer
         txtCustomerName.setText(order.getCustomerDisplayName());
 
         String email = "—";
-        if (order.getCustomer() != null && order.getCustomer().getEmail() != null
+        if (order.getCustomer() != null
+                && order.getCustomer().getEmail() != null
                 && !order.getCustomer().getEmail().trim().isEmpty()) {
             email = order.getCustomer().getEmail().trim();
         }
         txtCustomerEmail.setText(email);
         txtCustomerPhone.setText(getCustomerPhone(order));
 
-        // Order items (numbered list)
         layoutOrderItems.removeAllViews();
         List<OrderItem> items = order.getItems() != null ? order.getItems() : new ArrayList<>();
 
         if (items.isEmpty()) {
-            txtEmptyItems.setVisibility(View.VISIBLE);
+            if (txtEmptyItems != null) txtEmptyItems.setVisibility(View.VISIBLE);
             txtSubtotal.setText(formatMoney(0));
             txtShippingCost.setText(formatMoney(0));
         } else {
-            txtEmptyItems.setVisibility(View.GONE);
+            if (txtEmptyItems != null) txtEmptyItems.setVisibility(View.GONE);
             double itemsTotal = 0;
             int index = 1;
             for (OrderItem item : items) {
@@ -266,13 +250,10 @@ public class OrderDetailActivity extends AppCompatActivity {
                 addOrderItemRow(index++, item);
             }
             txtSubtotal.setText(formatMoney(itemsTotal));
-
-            // Approximate shipping until real field exists
             double shipping = Math.max(0, order.getTotalPrice() - itemsTotal);
             txtShippingCost.setText(formatMoney(shipping));
         }
 
-        // Shipping information
         if (order.getShippingAddress() != null) {
             ShippingAddress sa = order.getShippingAddress();
             StringBuilder addr = new StringBuilder();
@@ -282,9 +263,6 @@ public class OrderDetailActivity extends AppCompatActivity {
             if (sa.getCity() != null && !sa.getCity().trim().isEmpty()) {
                 if (addr.length() > 0) addr.append(", ");
                 addr.append(sa.getCity().trim());
-            }
-            if (sa.getName() != null && !sa.getName().trim().isEmpty() && addr.length() == 0) {
-                addr.append(sa.getName().trim());
             }
             txtShippingAddress.setText(addr.length() > 0 ? addr.toString() : "—");
 
@@ -299,7 +277,6 @@ public class OrderDetailActivity extends AppCompatActivity {
             txtShippingDetails.setVisibility(View.GONE);
         }
 
-        // Summary
         txtSummaryTotal.setText(formatMoney(order.getTotalPrice()));
 
         String method = order.getPaymentMethod() != null ? order.getPaymentMethod() : "—";
@@ -342,42 +319,73 @@ public class OrderDetailActivity extends AppCompatActivity {
         return "—";
     }
 
-    // ------------------------------------------------------------------
-    // Status update
-    // ------------------------------------------------------------------
+    private void updatePrimaryButton() {
+        if (btnPrimaryAction == null || currentOrder == null) return;
 
-    private void showStatusPicker() {
+        int status = currentOrder.getStatus();
+        switch (status) {
+            case 2:
+                btnPrimaryAction.setText("Confirm Order");
+                btnPrimaryAction.setEnabled(true);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+            case 3:
+                btnPrimaryAction.setText("Start Preparing");
+                btnPrimaryAction.setEnabled(true);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+            case 4:
+                btnPrimaryAction.setText("Mark Ready");
+                btnPrimaryAction.setEnabled(true);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+            case 5:
+                btnPrimaryAction.setText("Ready for Pickup");
+                btnPrimaryAction.setEnabled(true);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+            default:
+                btnPrimaryAction.setText("Completed");
+                btnPrimaryAction.setEnabled(false);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+        }
+    }
+
+    private void onPrimaryActionClicked() {
         if (currentOrder == null) return;
 
-        final String[] labels = {
-                "Pending",
-                "New Order",
-                "Confirmed",
-                "Preparing",
-                "Ready for Pickup",
-                "Driver on the way",
-                "Driver is here",
-                "Rejected"
-        };
-        final int[] codes = {1, 2, 3, 4, 5, 6, 7, 9};
-
-        new AlertDialog.Builder(this)
-                .setTitle("Update Status")
-                .setItems(labels, (dialog, which) -> updateOrderStatus(codes[which]))
-                .setNegativeButton("Cancel", null)
-                .show();
+        int status = currentOrder.getStatus();
+        int nextStatus;
+        switch (status) {
+            case 2:
+                nextStatus = 3;
+                break;
+            case 3:
+                nextStatus = 4;
+                break;
+            case 4:
+                nextStatus = 5;
+                break;
+            case 5:
+                nextStatus = 5;
+                break;
+            default:
+                return;
+        }
+        updateOrderStatus(nextStatus);
     }
 
     private void updateOrderStatus(int newStatus) {
         if (currentOrder == null || orderId == null) return;
 
         showLoading(true);
-        btnUpdateStatus.setEnabled(false);
+        if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(false);
 
         String token = authManager.getBearerToken();
         if (token == null) {
             showLoading(false);
-            btnUpdateStatus.setEnabled(true);
+            if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(true);
             Toast.makeText(this, "Not authenticated", Toast.LENGTH_SHORT).show();
             return;
         }
@@ -394,29 +402,33 @@ public class OrderDetailActivity extends AppCompatActivity {
             public void onResponse(@NonNull Call<OrderUpdateResponse> call,
                                    @NonNull Response<OrderUpdateResponse> response) {
                 showLoading(false);
-                btnUpdateStatus.setEnabled(true);
 
                 if (response.isSuccessful()) {
-                    currentOrder.setStatus(newStatus);
+                    if (response.body() != null && response.body().getData() != null) {
+                        currentOrder = response.body().getData();
+                        orderId = currentOrder.getId();
+                    } else {
+                        currentOrder.setStatus(newStatus);
+                    }
                     bindOrder(currentOrder);
+                    updatePrimaryButton();
                     Toast.makeText(OrderDetailActivity.this, "Status updated", Toast.LENGTH_SHORT).show();
                 } else {
-                    Toast.makeText(OrderDetailActivity.this, "Failed to update status", Toast.LENGTH_LONG).show();
+                    if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(true);
+                    Toast.makeText(OrderDetailActivity.this,
+                            "Failed to update status (" + response.code() + ")",
+                            Toast.LENGTH_LONG).show();
                 }
             }
 
             @Override
             public void onFailure(@NonNull Call<OrderUpdateResponse> call, @NonNull Throwable t) {
                 showLoading(false);
-                btnUpdateStatus.setEnabled(true);
+                if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(true);
                 Toast.makeText(OrderDetailActivity.this, "Error: " + t.getMessage(), Toast.LENGTH_LONG).show();
             }
         });
     }
-
-    // ------------------------------------------------------------------
-    // Printing (SM1 + Bluetooth)
-    // ------------------------------------------------------------------
 
     private void onPrintClicked() {
         if (currentOrder == null) {
@@ -439,7 +451,6 @@ public class OrderDetailActivity extends AppCompatActivity {
                 openPrinterPicker();
             }
         } else {
-            // Built-in SM1
             connectAndPrint(null);
         }
     }
@@ -454,14 +465,16 @@ public class OrderDetailActivity extends AppCompatActivity {
     }
 
     private void connectAndPrint(String mac) {
-        btnPrint.setEnabled(false);
-        btnPrint.setText("Connecting…");
+        if (btnPrint != null) {
+            btnPrint.setEnabled(false);
+            btnPrint.setText("Connecting…");
+        }
 
         IPrinter.ConnectionCallback callback = new IPrinter.ConnectionCallback() {
             @Override
             public void onConnected() {
                 runOnUiThread(() -> {
-                    btnPrint.setText("Printing…");
+                    if (btnPrint != null) btnPrint.setText("Printing…");
                     doPrintReceipt();
                 });
             }
@@ -469,8 +482,10 @@ public class OrderDetailActivity extends AppCompatActivity {
             @Override
             public void onConnectionFailed(String error) {
                 runOnUiThread(() -> {
-                    btnPrint.setEnabled(true);
-                    btnPrint.setText("Print Receipt");
+                    if (btnPrint != null) {
+                        btnPrint.setEnabled(true);
+                        btnPrint.setText("Print Receipt");
+                    }
                     Toast.makeText(OrderDetailActivity.this,
                             "Could not connect: " + error, Toast.LENGTH_LONG).show();
 
@@ -484,8 +499,10 @@ public class OrderDetailActivity extends AppCompatActivity {
             @Override
             public void onDisconnected() {
                 runOnUiThread(() -> {
-                    btnPrint.setEnabled(true);
-                    btnPrint.setText("Print Receipt");
+                    if (btnPrint != null) {
+                        btnPrint.setEnabled(true);
+                        btnPrint.setText("Print Receipt");
+                    }
                 });
             }
         };
@@ -511,8 +528,10 @@ public class OrderDetailActivity extends AppCompatActivity {
                 public void onSuccess() {
                     runOnUiThread(() -> {
                         Toast.makeText(OrderDetailActivity.this, "Receipt printed", Toast.LENGTH_SHORT).show();
-                        btnPrint.setEnabled(true);
-                        btnPrint.setText("Print Receipt");
+                        if (btnPrint != null) {
+                            btnPrint.setEnabled(true);
+                            btnPrint.setText("Print Receipt");
+                        }
                     });
                 }
 
@@ -521,30 +540,25 @@ public class OrderDetailActivity extends AppCompatActivity {
                     runOnUiThread(() -> {
                         Toast.makeText(OrderDetailActivity.this,
                                 "Print failed: " + message, Toast.LENGTH_LONG).show();
-                        btnPrint.setEnabled(true);
-                        btnPrint.setText("Print Receipt");
+                        if (btnPrint != null) {
+                            btnPrint.setEnabled(true);
+                            btnPrint.setText("Print Receipt");
+                        }
                     });
                 }
             });
         } catch (Exception e) {
-            btnPrint.setEnabled(true);
-            btnPrint.setText("Print Receipt");
+            if (btnPrint != null) {
+                btnPrint.setEnabled(true);
+                btnPrint.setText("Print Receipt");
+            }
             Toast.makeText(this, "Print failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
     }
 
-    // ------------------------------------------------------------------
-    // Track Order
-    // ------------------------------------------------------------------
-
     private void onTrackOrderClicked() {
-        // TODO: replace with real tracking screen / URL / map
         Toast.makeText(this, "Track Order – coming soon", Toast.LENGTH_SHORT).show();
     }
-
-    // ------------------------------------------------------------------
-    // Permissions
-    // ------------------------------------------------------------------
 
     private boolean hasBluetoothPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return true;
@@ -585,12 +599,10 @@ public class OrderDetailActivity extends AppCompatActivity {
         }
     }
 
-    // ------------------------------------------------------------------
-    // Helpers
-    // ------------------------------------------------------------------
-
     private void showLoading(boolean show) {
-        progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        if (progressBar != null) {
+            progressBar.setVisibility(show ? View.VISIBLE : View.GONE);
+        }
     }
 
     private String safe(String value) {
@@ -598,7 +610,6 @@ public class OrderDetailActivity extends AppCompatActivity {
     }
 
     private String formatMoney(double amount) {
-        // Match screenshot style: "KES 116" (no decimals if whole number looks cleaner)
         if (amount == (long) amount) {
             return String.format(Locale.getDefault(), "KES %d", (long) amount);
         }
