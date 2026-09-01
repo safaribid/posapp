@@ -49,7 +49,12 @@ public class LoginActivity extends AppCompatActivity {
             android.util.Log.d("LoginActivity", "User Data: " + userData.toString());
             String name = userData.optString("fname", "User");
             Toast.makeText(LoginActivity.this, "Welcome back " + name, Toast.LENGTH_SHORT).show();
-            SocketManager.getInstance().connect(userData.optString("id", ""));
+
+            // AuthCallback onSuccess — after login succeeds
+            String uid = userData.optString("id", "");
+            if (!uid.isEmpty()) {
+                SocketManager.getInstance().connect(uid);
+            }
             goToOrders();
         }
 
@@ -68,6 +73,10 @@ public class LoginActivity extends AppCompatActivity {
         authManager = new AuthManager(this);
 
         if (authManager.isLoggedIn()) {
+            String uid = authManager.getUserId();
+            if (uid != null && !uid.isEmpty()) {
+                SocketManager.getInstance().connect(uid);
+            }
             goToOrders();
             return;
         }

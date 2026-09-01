@@ -170,11 +170,27 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         updateFilterButtonStyles();
 
         // Socket
-        SocketManager.getInstance().setOrderListener(this);
-        String userId = authManager.getUserId();
-        if (userId != null) {
-            SocketManager.getInstance().connect(userId);
+        String uid = authManager.getUserId();
+        if (uid != null && !uid.isEmpty()) {
+            SocketManager.getInstance().connect(uid);
         }
+        SocketManager.getInstance().setOrderListener(this);
+
+        SocketManager.getInstance().setConnectionListener(new SocketManager.ConnectionListener() {
+            @Override public void onConnected() {
+                Log.d("OrdersActivity", "socket connected");
+            }
+            @Override public void onDisconnected() {
+                Log.d("OrdersActivity", "socket disconnected");
+            }
+            @Override public void onRegistered(String uid) {
+                Log.d("OrdersActivity", "socket registered uid=" + uid);
+                Toast.makeText(OrdersActivity.this, "Live updates on", Toast.LENGTH_SHORT).show();
+            }
+            @Override public void onError(String message) {
+                Log.e("OrdersActivity", "socket error: " + message);
+            }
+        });
 
         loadOrders();
     }
@@ -463,17 +479,18 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     }
 
     @Override
-    public void onNewOrder(String orderJson) {
+    public void onOrderRequest(String orderJson) {
+        // P2: refresh list + sound
         runOnUiThread(() -> {
             playNotificationSound();
-            Toast.makeText(this, "New order received!", Toast.LENGTH_SHORT).show();
             loadOrders();
         });
     }
 
     @Override
-    public void onOrderUpdated(String orderJson) {
-        runOnUiThread(this::loadOrders);
+    public void onDeliveryStatus(String payloadJson) {
+        // P3: handle later — for now just log
+        Log.d("OrdersActivity", "delivery_status: " + payloadJson);
     }
 
     private void playNotificationSound() {
