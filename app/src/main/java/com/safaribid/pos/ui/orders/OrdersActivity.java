@@ -170,11 +170,11 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         updateFilterButtonStyles();
 
         // Socket
+        SocketManager.getInstance().setOrderListener(this);
         String uid = authManager.getUserId();
         if (uid != null && !uid.isEmpty()) {
             SocketManager.getInstance().connect(uid);
         }
-        SocketManager.getInstance().setOrderListener(this);
 
         SocketManager.getInstance().setConnectionListener(new SocketManager.ConnectionListener() {
             @Override public void onConnected() {
@@ -271,6 +271,8 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                     OrdersResponse body = response.body();
                     List<Order> orders = body.getData();
 
+                    Log.d(TAG, "loadOrders success, count=" + (orders != null ? orders.size() : 0));
+
                     allOrders.clear();
                     if (orders != null) {
                         allOrders.addAll(orders);
@@ -307,7 +309,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                     Toast.makeText(OrdersActivity.this,
                             "Failed to load orders (" + response.code() + ")",
                             Toast.LENGTH_SHORT).show();
-                    Log.e(TAG, "Error: " + response.code());
+                    Log.e(TAG, "loadOrders failed code=" + response.code());
                 }
             }
 
@@ -480,17 +482,55 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
 
     @Override
     public void onOrderRequest(String orderJson) {
-        // P2: refresh list + sound
+        Log.d(TAG, "order_request received");
         runOnUiThread(() -> {
             playNotificationSound();
+            Toast.makeText(this, "New order received!", Toast.LENGTH_SHORT).show();
+
+            // Force a visible refresh cue
+            if (swipeRefresh != null) {
+                swipeRefresh.setRefreshing(true);
+            }
+
+            // Optional: parse and prepend if JSON is a full Order
+            try {
+                Order incoming = new Gson().fromJson(orderJson, Order.class);
+                if (incoming != null && incoming.getId() != null) {
+                    // Remove duplicate if already in list, then add at top
+                    for (int i = allOrders.size() - 1; i >= 0; i--) {
+                        if (incoming.getId().equals(allOrders.get(i).getId())) {
+                            allOrders.remove(i);
+                        }
+                    }
+                    allOrders.add(0, incoming);
+                    applyFilters();
+                    recyclerView.setVisibility(View.VISIBLE);
+                    tvEmpty.setVisibility(View.GONE);
+
+                    // Immediate scroll for the prepended item
+                    recyclerView.scrollToPosition(0);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "parse order_request failed", e);
+            }
+
+            // Always refresh from API so list matches server
+            Log.d(TAG, "calling loadOrders()");
             loadOrders();
+
+            // Optional: scroll to top after load finishes (safety)
+            recyclerView.post(() -> {
+                if (adapter != null && adapter.getItemCount() > 0) {
+                    recyclerView.scrollToPosition(0);
+                }
+            });
         });
     }
 
     @Override
     public void onDeliveryStatus(String payloadJson) {
-        // P3: handle later — for now just log
-        Log.d("OrdersActivity", "delivery_status: " + payloadJson);
+        // P3 — log only for now
+        Log.d(TAG, "delivery_status: " + payloadJson);
     }
 
     private void playNotificationSound() {
