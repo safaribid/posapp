@@ -27,6 +27,7 @@ import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderUpdateResponse;
 import com.safaribid.pos.models.OrdersResponse;
@@ -63,6 +64,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private AuthManager authManager;
 
     private final List<Order> allOrders = new ArrayList<>();
+    private final Map<String, String> deliveryLabelsByOrderId = new HashMap<>();
     private String currentQuery = "";
     private String currentFilter = "all"; // all | active | unfulfilled | partial
 
@@ -207,6 +209,18 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         });
 
         loadOrders();
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        SocketManager.getInstance().setOrderListener(this);
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Option: SocketManager.getInstance().setOrderListener(null);
     }
 
     private void setupSearch() {
@@ -536,8 +550,63 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
 
     @Override
     public void onDeliveryStatus(String payloadJson) {
-        // P3 — log only for now
         Log.d(TAG, "delivery_status: " + payloadJson);
+
+        runOnUiThread(() -> {
+            DeliveryStatusEvent event = null;
+            try {
+                event = new Gson().fromJson(payloadJson, DeliveryStatusEvent.class);
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to parse delivery_status", e);
+            }
+
+            if (event == null) {
+                loadOrders();
+                return;
+            }
+
+            String label = event.getStatusLabel();
+            Toast.makeText(this, label, Toast.LENGTH_SHORT).show();
+
+            // Optional short sound on accept / complete
+            if (event.getStatus() == 3 || event.getStatus() == 8) {
+                playNotificationSound();
+            }
+
+            // Keep local order chip in sync when backend sends shopOrderStatus
+            if (event.getShopOrderStatus() != null && event.getShopOrderId() != null) {
+                patchOrderStatus(event.getShopOrderId(), event.getShopOrderStatus());
+            }
+
+            if (event.getShopOrderId() != null) {
+                deliveryLabelsByOrderId.put(event.getShopOrderId(), event.getStatusLabel());
+                if (adapter != null) {
+                    adapter.setDeliveryLabel(event.getShopOrderId(), event.getStatusLabel());
+                }
+            }
+
+            // Completed delivery → full refresh so order list matches server
+            if (event.getStatus() == 8) {
+                loadOrders();
+            } else {
+                // Lighter path: still refresh so any linked fields stay correct
+                loadOrders();
+            }
+        });
+    }
+
+    /** Update one order's status in memory if present, then re-filter. */
+    private void patchOrderStatus(String orderId, int newStatus) {
+        if (orderId == null) return;
+        for (int i = 0; i < allOrders.size(); i++) {
+            Order o = allOrders.get(i);
+            if (orderId.equals(o.getId())) {
+                o.setStatus(newStatus);
+                allOrders.set(i, o);
+                applyFilters();
+                return;
+            }
+        }
     }
 
     private void playNotificationSound() {

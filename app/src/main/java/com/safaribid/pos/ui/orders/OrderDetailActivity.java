@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -24,12 +25,14 @@ import androidx.core.content.ContextCompat;
 import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
 import com.safaribid.pos.models.OrderUpdateResponse;
 import com.safaribid.pos.models.ShippingAddress;
 import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
+import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.printer.IPrinter;
 import com.safaribid.pos.printer.PrinterFactory;
 import com.safaribid.pos.printer.PrinterPickerActivity;
@@ -75,6 +78,42 @@ public class OrderDetailActivity extends AppCompatActivity {
     private IPrinter printer;
 
     private final Gson gson = new Gson();
+
+    private final SocketManager.OrderListener detailSocketListener =
+            new SocketManager.OrderListener() {
+                @Override
+                public void onOrderRequest(String orderJson) {
+                    // ignore or reload if same id
+                }
+
+                @Override
+                public void onDeliveryStatus(String payloadJson) {
+                    runOnUiThread(() -> {
+                        try {
+                            DeliveryStatusEvent event =
+                                    new Gson().fromJson(payloadJson, DeliveryStatusEvent.class);
+                            if (event == null) return;
+
+                            Toast.makeText(
+                                    OrderDetailActivity.this,
+                                    event.getStatusLabel(),
+                                    Toast.LENGTH_SHORT
+                            ).show();
+
+                            // If shop order status provided, update chip
+                            if (event.getShopOrderStatus() != null && currentOrder != null) {
+                                currentOrder.setStatus(event.getShopOrderStatus());
+                                bindOrder(currentOrder);
+                                updatePrimaryButton();
+                            } else if (orderId != null) {
+                                loadOrder(orderId);
+                            }
+                        } catch (Exception e) {
+                            Log.e("OrderDetail", "delivery_status parse error", e);
+                        }
+                    });
+                }
+            };
 
     private final ActivityResultLauncher<Intent> printerPickerLauncher =
             registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
@@ -129,6 +168,28 @@ public class OrderDetailActivity extends AppCompatActivity {
         } else {
             loadOrder(orderId);
         }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        SocketManager.getInstance().setOrderListener(detailSocketListener);
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (orderId != null) {
+            // Optional: reload order so shopOrderStatus stays current after driver updates
+            // loadOrder(orderId);
+        }
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        // Hand listener back to list when leaving detail
+        SocketManager.getInstance().setOrderListener(null);
     }
 
     private void bindViews() {

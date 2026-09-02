@@ -81,6 +81,18 @@
             android:textSize="13sp"
             android:textColor="#616161" />
 
+        <!-- Delivery Status Label -->
+        <TextView
+            android:id="@+id/tvDeliveryStatus"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:text="Driver searching..."
+            android:textSize="13sp"
+            android:textStyle="italic"
+            android:textColor="#2E7D32"
+            android:visibility="gone" />
+
         <!-- Price + Actions row -->
         <LinearLayout
             android:layout_width="match_parent"

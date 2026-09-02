@@ -17,8 +17,10 @@ import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHolder> {
 
@@ -30,6 +32,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
     }
 
     private final List<Order> orders = new ArrayList<>();
+    private final Map<String, String> deliveryLabels = new HashMap<>();
     private final OnOrderActionListener listener;
 
     public OrderAdapter(OnOrderActionListener listener) {
@@ -47,6 +50,17 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
     public void addOrder(Order order) {
         orders.add(0, order);
         notifyItemInserted(0);
+    }
+
+    public void setDeliveryLabel(String orderId, String label) {
+        if (orderId == null) return;
+        deliveryLabels.put(orderId, label);
+        for (int i = 0; i < orders.size(); i++) {
+            if (orderId.equals(orders.get(i).getId())) {
+                notifyItemChanged(i);
+                break;
+            }
+        }
     }
 
     @NonNull
@@ -69,7 +83,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
 
     class OrderViewHolder extends RecyclerView.ViewHolder {
         CardView cardOrder;
-        TextView tvOrderNumber, tvStatus, tvTime, tvCustomer, tvItemsSummary, tvTotal;
+        TextView tvOrderNumber, tvStatus, tvTime, tvCustomer, tvItemsSummary, tvTotal, tvDeliveryStatus;
         LinearLayout layoutNewOrderActions;
         Button btnReject, btnAccept, btnPrimaryAction;
 
@@ -82,6 +96,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             tvCustomer = itemView.findViewById(R.id.tvCustomer);
             tvItemsSummary = itemView.findViewById(R.id.tvItemsSummary);
             tvTotal = itemView.findViewById(R.id.tvTotal);
+            tvDeliveryStatus = itemView.findViewById(R.id.tvDeliveryStatus);
             layoutNewOrderActions = itemView.findViewById(R.id.layoutNewOrderActions);
             btnReject = itemView.findViewById(R.id.btnReject);
             btnAccept = itemView.findViewById(R.id.btnAccept);
@@ -98,6 +113,14 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             tvTotal.setText(String.format(Locale.getDefault(), "KES %.0f", order.getTotalPrice()));
             tvTime.setText(formatTimeAgo(order.getCreatedAt()));
             tvItemsSummary.setText(buildItemsSummary(order));
+
+            String deliveryLabel = deliveryLabels.get(order.getId());
+            if (deliveryLabel != null && !deliveryLabel.isEmpty()) {
+                tvDeliveryStatus.setText(deliveryLabel);
+                tvDeliveryStatus.setVisibility(View.VISIBLE);
+            } else {
+                tvDeliveryStatus.setVisibility(View.GONE);
+            }
 
             String statusLabel = order.getStatusLabel();
             tvStatus.setText(statusLabel);
