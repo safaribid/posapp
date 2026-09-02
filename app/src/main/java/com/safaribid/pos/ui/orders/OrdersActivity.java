@@ -1,9 +1,12 @@
 package com.safaribid.pos.ui.orders;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.media.Ringtone;
 import android.media.RingtoneManager;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.text.Editable;
 import android.text.TextWatcher;
@@ -16,6 +19,8 @@ import android.widget.Toast;
 
 import androidx.activity.OnBackPressedCallback;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.view.GravityCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.recyclerview.widget.LinearLayoutManager;
@@ -34,6 +39,7 @@ import com.safaribid.pos.models.OrdersResponse;
 import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
+import com.safaribid.pos.notifications.NotificationHelper;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -79,6 +85,18 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
             finish();
             return;
         }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                        this,
+                        new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                        3001
+                );
+            }
+        }
+        NotificationHelper.ensureChannels(this);
 
         drawerLayout = findViewById(R.id.drawerLayout);
         navigationView = findViewById(R.id.navigationView);

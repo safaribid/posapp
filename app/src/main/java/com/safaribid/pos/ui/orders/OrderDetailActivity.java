@@ -139,6 +139,7 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         orderId = getIntent().getStringExtra(EXTRA_ORDER_ID);
         String orderJson = getIntent().getStringExtra(EXTRA_ORDER_JSON);
+
         if (orderJson != null && !orderJson.isEmpty()) {
             try {
                 currentOrder = gson.fromJson(orderJson, Order.class);
@@ -153,10 +154,6 @@ public class OrderDetailActivity extends AppCompatActivity {
             return;
         }
 
-        if (currentOrder != null && orderId == null) {
-            orderId = currentOrder.getId();
-        }
-
         bindViews();
         setupClickListeners();
 
@@ -166,7 +163,7 @@ public class OrderDetailActivity extends AppCompatActivity {
             bindOrder(currentOrder);
             updatePrimaryButton();
         } else {
-            loadOrder(orderId);
+            loadOrder(orderId); // HTTP fetch — required for FCM path
         }
     }
 
