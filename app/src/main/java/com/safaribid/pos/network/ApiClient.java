@@ -1,5 +1,9 @@
 package com.safaribid.pos.network;
 
+import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
+import com.safaribid.pos.models.GeoPoint;
+import com.safaribid.pos.models.GeoPointAdapter;
 import com.safaribid.pos.utils.AppConfig;
 
 import java.util.concurrent.TimeUnit;
@@ -25,6 +29,10 @@ public class ApiClient {
                     .writeTimeout(30, TimeUnit.SECONDS)
                     .build();
 
+            Gson gson = new GsonBuilder()
+                    .registerTypeAdapter(GeoPoint.class, new GeoPointAdapter())
+                    .create();
+
             String baseUrl = AppConfig.SERVER_API;
             if (!baseUrl.endsWith("/")) {
                 baseUrl = baseUrl + "/";
@@ -33,7 +41,7 @@ public class ApiClient {
             retrofit = new Retrofit.Builder()
                     .baseUrl(baseUrl)
                     .client(client)
-                    .addConverterFactory(GsonConverterFactory.create())
+                    .addConverterFactory(GsonConverterFactory.create(gson))
                     .build();
         }
         return retrofit;
