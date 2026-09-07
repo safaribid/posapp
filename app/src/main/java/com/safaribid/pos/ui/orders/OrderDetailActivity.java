@@ -25,6 +25,7 @@ import androidx.core.content.ContextCompat;
 import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.models.Delivery;
 import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
@@ -67,6 +68,9 @@ public class OrderDetailActivity extends AppCompatActivity {
     private TextView txtSubtotal, txtShippingCost, txtSummaryTotal, txtPaymentInfo, txtPaymentRef;
 
     private Button btnPrimaryAction;
+    private Button btnAccept;
+    private Button btnReject;
+    private View layoutNewOrderActions;
     private Button btnPrint, btnTrackOrder;
 
     private ProgressBar progressBar;
@@ -74,6 +78,10 @@ public class OrderDetailActivity extends AppCompatActivity {
     private Order currentOrder;
     private String orderId;
     private AuthManager authManager;
+
+    private String lastTrackingCode;
+    private String lastDeliveryId;
+    private Integer lastDeliveryStatus; // from socket; null if unknown
 
     private IPrinter printer;
 
@@ -100,14 +108,16 @@ public class OrderDetailActivity extends AppCompatActivity {
                                     Toast.LENGTH_SHORT
                             ).show();
 
-                            // If shop order status provided, update chip
+                            if (event.getDeliveryId() != null) {
+                                lastDeliveryStatus = event.getStatus();
+                            }
                             if (event.getShopOrderStatus() != null && currentOrder != null) {
                                 currentOrder.setStatus(event.getShopOrderStatus());
-                                bindOrder(currentOrder);
-                                updatePrimaryButton();
-                            } else if (orderId != null) {
-                                loadOrder(orderId);
                             }
+                            if (currentOrder != null) {
+                                bindOrder(currentOrder);
+                            }
+                            updateActionButtons();
                         } catch (Exception e) {
                             Log.e("OrderDetail", "delivery_status parse error", e);
                         }
@@ -153,7 +163,12 @@ public class OrderDetailActivity extends AppCompatActivity {
             }
         }
 
-        if (orderId == null && currentOrder == null) {
+        // Critical: list often passes JSON only
+        if (currentOrder != null && (orderId == null || orderId.isEmpty())) {
+            orderId = currentOrder.getId();
+        }
+
+        if ((orderId == null || orderId.isEmpty()) && currentOrder == null) {
             Toast.makeText(this, "Missing order", Toast.LENGTH_SHORT).show();
             finish();
             return;
@@ -166,7 +181,7 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         if (currentOrder != null) {
             bindOrder(currentOrder);
-            updatePrimaryButton();
+            updateActionButtons();
         } else {
             loadOrder(orderId); // HTTP fetch — required for FCM path
         }
@@ -223,12 +238,22 @@ public class OrderDetailActivity extends AppCompatActivity {
         txtPaymentRef = findViewById(R.id.txtPaymentRef);
 
         btnPrimaryAction = findViewById(R.id.btnUpdateStatus);
+        btnAccept = findViewById(R.id.btnAccept);
+        btnReject = findViewById(R.id.btnReject);
+        layoutNewOrderActions = findViewById(R.id.layoutNewOrderActions);
+
         btnPrint = findViewById(R.id.btnPrint);
         btnTrackOrder = findViewById(R.id.btnTrackOrder);
         progressBar = findViewById(R.id.progressBar);
     }
 
     private void setupClickListeners() {
+        if (btnAccept != null) {
+            btnAccept.setOnClickListener(v -> updateOrderStatus(3)); // Accept → Confirmed
+        }
+        if (btnReject != null) {
+            btnReject.setOnClickListener(v -> updateOrderStatus(9)); // or 10 — confirm with backend
+        }
         if (btnPrimaryAction != null) {
             btnPrimaryAction.setOnClickListener(v -> onPrimaryActionClicked());
         }
@@ -261,7 +286,7 @@ public class OrderDetailActivity extends AppCompatActivity {
                     currentOrder = response.body();
                     orderId = currentOrder.getId();
                     bindOrder(currentOrder);
-                    updatePrimaryButton();
+                    updateActionButtons();
                 } else {
                     Toast.makeText(OrderDetailActivity.this, "Failed to load order", Toast.LENGTH_LONG).show();
                 }
@@ -348,6 +373,17 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         String ref = order.getPaymentReference();
         txtPaymentRef.setText(ref != null && !ref.trim().isEmpty() ? "Ref: " + ref.trim() : "Ref: —");
+
+        // Chip text after bind:
+        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
+            String dLabel = Order.deliveryProgressLabel(lastDeliveryStatus);
+            if (dLabel != null) {
+                txtStatusChip.setText(dLabel.toUpperCase(Locale.getDefault()));
+            }
+        } else {
+            txtStatusChip.setText(order.getStatusLabel().toUpperCase(Locale.getDefault()));
+        }
+        updateActionButtons();
     }
 
     private void addOrderItemRow(int index, OrderItem item) {
@@ -382,61 +418,86 @@ public class OrderDetailActivity extends AppCompatActivity {
         return "—";
     }
 
-    private void updatePrimaryButton() {
-        if (btnPrimaryAction == null || currentOrder == null) return;
+    private void updateActionButtons() {
+        if (currentOrder == null) return;
 
         int status = currentOrder.getStatus();
+
+        // Driver has accepted or later → lock vendor actions
+        boolean driverLocked = lastDeliveryStatus != null && lastDeliveryStatus >= 3;
+
+        if (layoutNewOrderActions != null) {
+            boolean isNew = status == 2;
+            layoutNewOrderActions.setVisibility(isNew ? View.VISIBLE : View.GONE);
+        }
+
+        if (btnPrimaryAction == null) return;
+
+        if (status == 2) {
+            btnPrimaryAction.setVisibility(View.GONE);
+            return;
+        }
+
+        btnPrimaryAction.setVisibility(View.VISIBLE);
+
+        if (driverLocked) {
+            String label = Order.deliveryProgressLabel(lastDeliveryStatus);
+            if (label == null) label = currentOrder.getStatusLabel();
+            btnPrimaryAction.setText(label);
+            btnPrimaryAction.setEnabled(false);
+            if (txtStatusChip != null) {
+                txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
+            }
+            return;
+        }
+
         switch (status) {
-            case 2:
-                btnPrimaryAction.setText("Confirm Order");
-                btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setVisibility(View.VISIBLE);
-                break;
             case 3:
                 btnPrimaryAction.setText("Start Preparing");
                 btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setVisibility(View.VISIBLE);
                 break;
             case 4:
                 btnPrimaryAction.setText("Mark Ready");
                 btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setVisibility(View.VISIBLE);
                 break;
             case 5:
-                btnPrimaryAction.setText("Ready for Pickup");
-                btnPrimaryAction.setEnabled(true);
-                btnPrimaryAction.setVisibility(View.VISIBLE);
+                btnPrimaryAction.setText("Request Driver");
+                btnPrimaryAction.setEnabled(true); // can press again until driver accepts
                 break;
-            default:
+            case 8:
                 btnPrimaryAction.setText("Completed");
                 btnPrimaryAction.setEnabled(false);
-                btnPrimaryAction.setVisibility(View.VISIBLE);
+                break;
+            case 9:
+            case 10:
+                btnPrimaryAction.setText("Rejected");
+                btnPrimaryAction.setEnabled(false);
+                break;
+            default:
+                btnPrimaryAction.setText(currentOrder.getStatusLabel());
+                btnPrimaryAction.setEnabled(false);
                 break;
         }
     }
 
     private void onPrimaryActionClicked() {
         if (currentOrder == null) return;
+        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) return;
 
         int status = currentOrder.getStatus();
-        int nextStatus;
         switch (status) {
-            case 2:
-                nextStatus = 3;
-                break;
             case 3:
-                nextStatus = 4;
+                updateOrderStatus(4); // Start Preparing
                 break;
             case 4:
-                nextStatus = 5;
+                updateOrderStatus(5); // Mark Ready → Ready for Pickup (+ first dispatch)
                 break;
             case 5:
-                nextStatus = 5;
+                updateOrderStatus(5); // Request Driver again
                 break;
             default:
-                return;
+                break;
         }
-        updateOrderStatus(nextStatus);
     }
 
     private void updateOrderStatus(int newStatus) {
@@ -469,15 +530,26 @@ public class OrderDetailActivity extends AppCompatActivity {
                 if (response.isSuccessful()) {
                     if (response.body() != null && response.body().getData() != null) {
                         currentOrder = response.body().getData();
-                        orderId = currentOrder.getId();
-                    } else {
+                        if (currentOrder.getId() != null) {
+                            orderId = currentOrder.getId();
+                        }
+                    } else if (currentOrder != null) {
                         currentOrder.setStatus(newStatus);
                     }
+
+                    // Capture tracking code if provided
+                    if (response.body() != null && response.body().getDelivery() != null) {
+                        Delivery d = response.body().getDelivery();
+                        lastTrackingCode = d.getTrackingCode();
+                        lastDeliveryId = d.getId();
+                    }
+
                     bindOrder(currentOrder);
-                    updatePrimaryButton();
+                    updateActionButtons();
                     Toast.makeText(OrderDetailActivity.this, "Status updated", Toast.LENGTH_SHORT).show();
                 } else {
                     if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(true);
+                    updateActionButtons(); // restore correct enabled state
                     Toast.makeText(OrderDetailActivity.this,
                             "Failed to update status (" + response.code() + ")",
                             Toast.LENGTH_LONG).show();

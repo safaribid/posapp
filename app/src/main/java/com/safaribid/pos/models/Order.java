@@ -103,10 +103,23 @@ public class Order {
             case 5: return "Ready for Pickup";
             case 6: return "Driver on the way";
             case 7: return "Driver is here";
-            case 8: return "Delivered";
+            case 8: return "Completed";
             case 9:
             case 10: return "Rejected";
             default: return "Status " + status;
+        }
+    }
+
+    public static String deliveryProgressLabel(int deliveryStatus) {
+        switch (deliveryStatus) {
+            case 2: return "Searching for driver";
+            case 3: return "Driver accepted";
+            case 4: return "Driver on the way";
+            case 5: return "Driver is here";
+            case 6: return "Left the shop";
+            case 7: return "At customer";
+            case 8: return "Delivered";
+            default: return null;
         }
     }
 }

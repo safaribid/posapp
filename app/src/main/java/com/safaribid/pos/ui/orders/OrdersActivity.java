@@ -27,11 +27,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
+import com.facebook.shimmer.ShimmerFrameLayout;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.auth.LoginActivity;
 import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderUpdateResponse;
@@ -40,6 +42,7 @@ import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.notifications.NotificationHelper;
+import com.safaribid.pos.printer.PrinterPickerActivity;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,7 +59,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private static final String TAG = "OrdersActivity";
 
     private RecyclerView recyclerView;
-    private com.facebook.shimmer.ShimmerFrameLayout shimmerLayout;
+    private ShimmerFrameLayout shimmerLayout;
     private TextView tvEmpty;
     private SwipeRefreshLayout swipeRefresh;
     private TextInputEditText etSearch;
@@ -72,7 +75,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private final List<Order> allOrders = new ArrayList<>();
     private final Map<String, String> deliveryLabelsByOrderId = new HashMap<>();
     private String currentQuery = "";
-    private String currentFilter = "all"; // all | active | unfulfilled | partial
+    private String currentFilter = "all"; // all | active | new | completed
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -143,7 +146,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                 // Already on Orders
                 return true;
             } else if (id == R.id.nav_printer) {
-                startActivity(new Intent(this, com.safaribid.pos.printer.PrinterPickerActivity.class));
+                startActivity(new Intent(this, PrinterPickerActivity.class));
                 return true;
             } else if (id == R.id.nav_logout) {
                 logout();
@@ -169,10 +172,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
 
             @Override
             public void onReject(Order order) {
-                // Confirm reject status code with backend
-                Toast.makeText(OrdersActivity.this,
-                        "Reject status code to be confirmed with backend",
-                        Toast.LENGTH_SHORT).show();
+                updateOrderStatus(order, 9); // or 10 — confirm with backend
             }
 
             @Override
@@ -262,8 +262,12 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private void setupFilters() {
         btnFilterAll.setOnClickListener(v -> setFilter("all"));
         btnFilterActive.setOnClickListener(v -> setFilter("active"));
-        btnFilterUnfulfilled.setOnClickListener(v -> setFilter("unfulfilled"));
-        btnFilterPartial.setOnClickListener(v -> setFilter("partial"));
+        // rename unfulfilled → New Order
+        btnFilterUnfulfilled.setText("New Order");
+        btnFilterUnfulfilled.setOnClickListener(v -> setFilter("new"));
+        // rename partial → Completed
+        btnFilterPartial.setText("Completed");
+        btnFilterPartial.setOnClickListener(v -> setFilter("completed"));
     }
 
     private void setFilter(String filter) {
@@ -275,8 +279,8 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     private void updateFilterButtonStyles() {
         styleFilterButton(btnFilterAll, "all".equals(currentFilter));
         styleFilterButton(btnFilterActive, "active".equals(currentFilter));
-        styleFilterButton(btnFilterUnfulfilled, "unfulfilled".equals(currentFilter));
-        styleFilterButton(btnFilterPartial, "partial".equals(currentFilter));
+        styleFilterButton(btnFilterUnfulfilled, "new".equals(currentFilter));
+        styleFilterButton(btnFilterPartial, "completed".equals(currentFilter));
     }
 
     private void styleFilterButton(Button button, boolean selected) {
@@ -470,17 +474,13 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
 
     private boolean matchesFilter(Order order) {
         int status = order.getStatus();
-
         switch (currentFilter) {
-            case "unfulfilled":
-                // New orders before accept/reject
+            case "new":
                 return status == 2;
-            case "partial":
-                // Preparing / ready
-                return status == 3 || status == 4;
             case "active":
-                // Everything not completed/cancelled
-                return status != 5 && status != 6;
+                return status >= 3 && status <= 7;
+            case "completed":
+                return status == 8; // or status == 8 || status == 9 || status == 10
             case "all":
             default:
                 return true;
@@ -513,7 +513,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         SocketManager.getInstance().disconnect();
         authManager.logout();
         Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
-        Intent intent = new Intent(this, com.safaribid.pos.auth.LoginActivity.class);
+        Intent intent = new Intent(this, LoginActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
         startActivity(intent);
         finish();
