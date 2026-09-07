@@ -113,6 +113,11 @@ public class OrderDetailActivity extends AppCompatActivity {
                         }
                     });
                 }
+
+                @Override
+                public void onDriverLocation(String payloadJson) {
+                    // Not used in detail view, tracking has its own activity
+                }
             };
 
     private final ActivityResultLauncher<Intent> printerPickerLauncher =
@@ -615,7 +620,13 @@ public class OrderDetailActivity extends AppCompatActivity {
     }
 
     private void onTrackOrderClicked() {
-        Toast.makeText(this, "Track Order – coming soon", Toast.LENGTH_SHORT).show();
+        if (currentOrder == null || currentOrder.getId() == null) {
+            Toast.makeText(this, "No order loaded", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent intent = new Intent(this, TrackOrderActivity.class);
+        intent.putExtra(TrackOrderActivity.EXTRA_SHOP_ORDER_ID, currentOrder.getId());
+        startActivity(intent);
     }
 
     private boolean hasBluetoothPermission() {

@@ -613,6 +613,11 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         });
     }
 
+    @Override
+    public void onDriverLocation(String payloadJson) {
+        // no-op on list
+    }
+
     /** Update one order's status in memory if present, then re-filter. */
     private void patchOrderStatus(String orderId, int newStatus) {
         if (orderId == null) return;

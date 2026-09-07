@@ -54,6 +54,11 @@
             android:screenOrientation="portrait" />
 
         <activity
+            android:name=".ui.orders.TrackOrderActivity"
+            android:exported="false"
+            android:screenOrientation="portrait" />
+
+        <activity
             android:name=".printer.PrinterPickerActivity"
             android:exported="false" />
 
@@ -68,6 +73,10 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="orders_v1" />
+
+        <meta-data
+            android:name="com.google.android.geo.API_KEY"
+            android:value="${MAPS_API_KEY}" />
 
     </application>
 

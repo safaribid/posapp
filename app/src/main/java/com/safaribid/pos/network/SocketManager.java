@@ -64,6 +64,9 @@ public class SocketManager {
 
         /** P3: delivery_status payload JSON */
         void onDeliveryStatus(String payloadJson);
+
+        /** Live GPS for track map */
+        void onDriverLocation(String payloadJson);
     }
 
     private SocketManager() {
@@ -249,6 +252,16 @@ public class SocketManager {
             mainHandler.post(() -> {
                 if (orderListener != null && json != null) {
                     orderListener.onDeliveryStatus(json);
+                }
+            });
+        });
+
+        socket.on("driver_location", args -> {
+            final String json = firstArgToString(args);
+            Log.d(TAG, "driver_location: " + json);
+            mainHandler.post(() -> {
+                if (orderListener != null && json != null) {
+                    orderListener.onDriverLocation(json);
                 }
             });
         });

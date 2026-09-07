@@ -33,9 +33,16 @@ android {
         buildConfigField("String", "SUPABASE_PUB_KEY", "\"${localProperties.getProperty("SUPABASE_PUB_KEY") ?: ""}\"")
         buildConfigField("String", "SERVER_API", "\"${localProperties.getProperty("SERVER_API") ?: ""}\"")
 
-        val mapsKey = localProperties.getProperty("MAPS_API_KEY") ?: ""
+        val mapsKey = localProperties.getProperty("MAPS_API_KEY")
+            ?: localProperties.getProperty("GOOGLE_MAPS_API_KEY")
+            ?: ""
+        val mapsMapId = localProperties.getProperty("MAPS_MAP_ID")
+            ?: localProperties.getProperty("GOOGLE_MAPS_MAP_ID")
+            ?: ""
+
         manifestPlaceholders["MAPS_API_KEY"] = mapsKey
         buildConfigField("String", "MAPS_API_KEY", "\"$mapsKey\"")
+        buildConfigField("String", "MAPS_MAP_ID", "\"$mapsMapId\"")
     }
 
     buildTypes {
