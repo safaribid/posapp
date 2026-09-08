@@ -13,14 +13,13 @@ import androidx.cardview.widget.CardView;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.safaribid.pos.R;
+import com.safaribid.pos.models.DeliveryProgressStore;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 
 public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHolder> {
 
@@ -32,7 +31,6 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
     }
 
     private final List<Order> orders = new ArrayList<>();
-    private final Map<String, String> deliveryLabels = new HashMap<>();
     private final OnOrderActionListener listener;
 
     public OrderAdapter(OnOrderActionListener listener) {
@@ -53,14 +51,8 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
     }
 
     public void setDeliveryLabel(String orderId, String label) {
-        if (orderId == null) return;
-        deliveryLabels.put(orderId, label);
-        for (int i = 0; i < orders.size(); i++) {
-            if (orderId.equals(orders.get(i).getId())) {
-                notifyItemChanged(i);
-                break;
-            }
-        }
+        // Now handled via DeliveryProgressStore + notifyDataSetChanged
+        notifyDataSetChanged();
     }
 
     @NonNull
@@ -114,15 +106,9 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             tvTime.setText(formatTimeAgo(order.getCreatedAt()));
             tvItemsSummary.setText(buildItemsSummary(order));
 
-            String deliveryLabel = deliveryLabels.get(order.getId());
-            if (deliveryLabel != null && !deliveryLabel.isEmpty()) {
-                tvDeliveryStatus.setText(deliveryLabel);
-                tvDeliveryStatus.setVisibility(View.VISIBLE);
-            } else {
-                tvDeliveryStatus.setVisibility(View.GONE);
-            }
+            tvDeliveryStatus.setVisibility(View.GONE);
 
-            String statusLabel = order.getStatusLabel();
+            String statusLabel = DeliveryProgressStore.displayLabel(order);
             tvStatus.setText(statusLabel);
 
             // New / unfulfilled orders → red style + Accept/Reject

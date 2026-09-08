@@ -28,6 +28,7 @@ import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.models.Delivery;
 import com.safaribid.pos.models.DeliveryListResponse;
+import com.safaribid.pos.models.DeliveryProgressStore;
 import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
@@ -247,6 +248,21 @@ public class OrderDetailActivity extends AppCompatActivity {
             DeliveryStatusEvent event = gson.fromJson(payloadJson, DeliveryStatusEvent.class);
             if (event == null) return;
 
+            // Update shared store
+            if (currentOrder != null && event.getDeliveryId() != null) {
+                DeliveryProgressStore.get().put(
+                        currentOrder.getId(),
+                        event.getDeliveryId(),
+                        event.getStatus()
+                );
+            } else if (event.getShopOrderId() != null) {
+                 DeliveryProgressStore.get().put(
+                        event.getShopOrderId(),
+                        event.getDeliveryId(),
+                        event.getStatus()
+                );
+            }
+
             // If we know deliveryId, ignore other deliveries
             if (lastDeliveryId != null
                     && event.getDeliveryId() != null
@@ -279,28 +295,10 @@ public class OrderDetailActivity extends AppCompatActivity {
     private void applyDeliveryProgressToUi() {
         if (currentOrder == null) return;
 
-        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
-            String label = deliveryStatusLabel(lastDeliveryStatus);
-            if (txtStatusChip != null) {
-                txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
-            }
-        } else if (txtStatusChip != null) {
-            txtStatusChip.setText(currentOrder.getStatusLabel().toUpperCase(Locale.getDefault()));
+        if (txtStatusChip != null) {
+            txtStatusChip.setText(DeliveryProgressStore.displayLabel(currentOrder).toUpperCase(Locale.getDefault()));
         }
         updateActionButtons();
-    }
-
-    private static String deliveryStatusLabel(int s) {
-        switch (s) {
-            case 2: return "Searching for driver";
-            case 3: return "Driver accepted";
-            case 4: return "Driver heading for pickup";
-            case 5: return "Driver is here";
-            case 6: return "Left the shop";
-            case 7: return "At customer";
-            case 8: return "Delivered";
-            default: return "Delivery status " + s;
-        }
     }
 
     private void afterOrderBound() {
@@ -341,6 +339,11 @@ public class OrderDetailActivity extends AppCompatActivity {
                             Delivery d = response.body().getData();
                             lastDeliveryId = d.getId();
                             lastDeliveryStatus = d.getStatus();
+
+                            if (currentOrder != null) {
+                                DeliveryProgressStore.get().put(currentOrder.getId(), d.getId(), d.getStatus());
+                            }
+                            
                             applyDeliveryProgressToUi();
                         }
                     }
@@ -371,6 +374,9 @@ public class OrderDetailActivity extends AppCompatActivity {
                                 if (shopOrderId.equals(d.getShopOrderId())) {
                                     lastDeliveryId = d.getId();
                                     lastDeliveryStatus = d.getStatus();
+                                    
+                                    DeliveryProgressStore.get().put(shopOrderId, d.getId(), d.getStatus());
+                                    
                                     applyDeliveryProgressToUi();
                                     return;
                                 }
@@ -547,10 +553,10 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
             btnPrimaryAction.setVisibility(View.VISIBLE);
-            btnPrimaryAction.setText(deliveryStatusLabel(lastDeliveryStatus));
+            btnPrimaryAction.setText(DeliveryProgressStore.labelFor(lastDeliveryStatus));
             btnPrimaryAction.setEnabled(false);
             if (txtStatusChip != null) {
-                txtStatusChip.setText(deliveryStatusLabel(lastDeliveryStatus).toUpperCase(Locale.getDefault()));
+                txtStatusChip.setText(DeliveryProgressStore.labelFor(lastDeliveryStatus).toUpperCase(Locale.getDefault()));
             }
             return;
         }
@@ -648,6 +654,8 @@ public class OrderDetailActivity extends AppCompatActivity {
                         Delivery d = response.body().getDelivery();
                         lastTrackingCode = d.getTrackingCode();
                         lastDeliveryId = d.getId();
+                        
+                        DeliveryProgressStore.get().put(orderId, d.getId(), d.getStatus());
                     }
 
                     bindOrder(currentOrder);
