@@ -230,7 +230,7 @@ public class OrderDetailActivity extends AppCompatActivity {
             btnAccept.setOnClickListener(v -> updateOrderStatus(3)); // Accept → Confirmed
         }
         if (btnReject != null) {
-            btnReject.setOnClickListener(v -> updateOrderStatus(9)); // or 10 — confirm with backend
+            btnReject.setOnClickListener(v -> updateOrderStatus(11)); // Reject → status 11
         }
         if (btnPrimaryAction != null) {
             btnPrimaryAction.setOnClickListener(v -> onPrimaryActionClicked());
@@ -248,18 +248,26 @@ public class OrderDetailActivity extends AppCompatActivity {
             DeliveryStatusEvent event = gson.fromJson(payloadJson, DeliveryStatusEvent.class);
             if (event == null) return;
 
+            int ds = event.getStatus();
+
+            // Driver rejected / cancelled search step — do NOT lock UI or show Rejected
+            if (ds == 10 || ds == 9) {
+                Log.d("OrderDetail", "Ignoring driver-reject delivery status=" + ds);
+                return;
+            }
+
             // Update shared store
             if (currentOrder != null && event.getDeliveryId() != null) {
                 DeliveryProgressStore.get().put(
                         currentOrder.getId(),
                         event.getDeliveryId(),
-                        event.getStatus()
+                        ds
                 );
             } else if (event.getShopOrderId() != null) {
                  DeliveryProgressStore.get().put(
                         event.getShopOrderId(),
                         event.getDeliveryId(),
-                        event.getStatus()
+                        ds
                 );
             }
 
@@ -275,7 +283,7 @@ public class OrderDetailActivity extends AppCompatActivity {
                 lastDeliveryId = event.getDeliveryId();
             }
 
-            lastDeliveryStatus = event.getStatus();
+            lastDeliveryStatus = ds;
 
             // Optional: keep shop order status in sync when backend sends it
             if (event.getShopOrderStatus() != null && currentOrder != null) {
@@ -551,7 +559,12 @@ public class OrderDetailActivity extends AppCompatActivity {
             return;
         }
 
-        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
+        // Lock only after accept (3) through delivered (8)
+        boolean driverLocked = lastDeliveryStatus != null
+                && lastDeliveryStatus >= 3
+                && lastDeliveryStatus <= 8;
+
+        if (driverLocked) {
             btnPrimaryAction.setVisibility(View.VISIBLE);
             btnPrimaryAction.setText(DeliveryProgressStore.labelFor(lastDeliveryStatus));
             btnPrimaryAction.setEnabled(false);
@@ -582,6 +595,7 @@ public class OrderDetailActivity extends AppCompatActivity {
                 break;
             case 9:
             case 10:
+            case 11:
                 btnPrimaryAction.setText("Rejected");
                 btnPrimaryAction.setEnabled(false);
                 break;

@@ -172,7 +172,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
 
             @Override
             public void onReject(Order order) {
-                updateOrderStatus(order, 9); // or 10 — confirm with backend
+                updateOrderStatus(order, 11); // Reject → status 11
             }
 
             @Override

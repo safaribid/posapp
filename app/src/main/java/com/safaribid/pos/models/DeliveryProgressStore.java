@@ -22,6 +22,11 @@ public final class DeliveryProgressStore {
     }
 
     public void put(String shopOrderId, String deliveryId, int deliveryStatus) {
+        // Filter: Only store 2-8, exclude 9/10 (driver rejects)
+        if (deliveryStatus >= 9 && deliveryStatus <= 10) {
+            return;
+        }
+
         if (deliveryId != null && !deliveryId.isEmpty()) {
             statusByDeliveryId.put(deliveryId, deliveryStatus);
         }
@@ -60,7 +65,8 @@ public final class DeliveryProgressStore {
     public static String displayLabel(Order order) {
         if (order == null) return "—";
         Integer ds = get().getByShopOrderId(order.getId());
-        if (ds != null && ds >= 3) {
+        // status 2 = searching, 3-8 = progress
+        if (ds != null && ds >= 2) {
             return labelFor(ds);
         }
         return order.getStatusLabel();
