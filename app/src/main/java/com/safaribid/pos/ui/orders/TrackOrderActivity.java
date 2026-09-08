@@ -30,6 +30,7 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.models.AddressInfo;
 import com.safaribid.pos.models.Delivery;
 import com.safaribid.pos.models.DeliveryListResponse;
 import com.safaribid.pos.models.DeliveryStatusEvent;
@@ -303,9 +304,35 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
         if (d.getTrackingCode() != null) trackingCode = d.getTrackingCode();
 
         txtTrackingCode.setText(trackingCode != null ? trackingCode : "—");
-        txtPickupName.setText(d.pickupTitle());
-        txtPickupAddress.setText(d.pickupSubtitle());
-        txtDropoffAddress.setText(d.dropoffSubtitle());
+
+        // PICKUP: name = shop; subtitle only if we have a real street field
+        AddressInfo pickup = d.getPickupAddress();
+        if (pickup != null) {
+            txtPickupName.setText(pickup.titleOrName());
+            // Prefer business street if API ever adds it; else show name only once
+            String sub = pickup.getAddress() != null ? pickup.displayLine() : "—";
+            // If displayLine() would repeat the shop name, keep subtitle as em dash
+            if (sub.equals(pickup.titleOrName())) {
+                txtPickupAddress.setText("—");
+            } else {
+                txtPickupAddress.setText(sub);
+            }
+        } else if (d.getBusiness() != null && d.getBusiness().getName() != null) {
+            txtPickupName.setText(d.getBusiness().getName());
+            txtPickupAddress.setText("—");
+        } else {
+            txtPickupName.setText("Pickup");
+            txtPickupAddress.setText("—");
+        }
+
+        // DROPOFF: name is the address text
+        AddressInfo drop = d.getDropoffAddress();
+        if (drop != null) {
+            txtDropoffAddress.setText(drop.displayLine()); // uses name
+        } else {
+            txtDropoffAddress.setText("—");
+        }
+
         txtDriverStatus.setText(d.driverStatusLabel());
 
         Log.d(TAG, "pickupCoords=" + d.getPickupCoords()
@@ -349,13 +376,22 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
     private void updateMapFromDelivery() {
         if (googleMap == null || delivery == null) return;
 
-        LatLng pickup = coordsOf(delivery.getPickupCoords());
-        // Fallback to business coords if pickup coords missing
-        if (pickup == null && delivery.getBusiness() != null) {
-            pickup = coordsOf(delivery.getBusiness().getCoords());
+        LatLng pickup = null;
+        LatLng dropoff = null;
+
+        AddressInfo pa = delivery.getPickupAddress();
+        if (pa != null && pa.hasCoords()) {
+            pickup = new LatLng(pa.getLat(), pa.getLng());
+        } else {
+            pickup = coordsOf(delivery.getPickupCoords()); // WKT fallback
         }
 
-        LatLng dropoff = coordsOf(delivery.getDropoffCoords());
+        AddressInfo da = delivery.getDropoffAddress();
+        if (da != null && da.hasCoords()) {
+            dropoff = new LatLng(da.getLat(), da.getLng());
+        } else {
+            dropoff = coordsOf(delivery.getDropoffCoords());
+        }
 
         if (markerA != null) markerA.remove();
         if (markerB != null) markerB.remove();
@@ -368,14 +404,17 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
             markerA = googleMap.addMarker(new MarkerOptions()
                     .position(pickup)
                     .title("A · Pickup")
+                    .snippet(pa != null ? pa.titleOrName() : "Pickup")
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_GREEN)));
             bounds.include(pickup);
             hasPoint = true;
         }
+
         if (dropoff != null) {
             markerB = googleMap.addMarker(new MarkerOptions()
                     .position(dropoff)
                     .title("B · Dropoff")
+                    .snippet(da != null ? da.displayLine() : "Dropoff")
                     .icon(BitmapDescriptorFactory.defaultMarker(BitmapDescriptorFactory.HUE_RED)));
             bounds.include(dropoff);
             hasPoint = true;
@@ -399,8 +438,9 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
             try {
                 googleMap.animateCamera(CameraUpdateFactory.newLatLngBounds(bounds.build(), 120));
             } catch (Exception e) {
-                if (pickup != null) {
-                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(pickup, 14f));
+                LatLng focus = pickup != null ? pickup : dropoff;
+                if (focus != null) {
+                    googleMap.moveCamera(CameraUpdateFactory.newLatLngZoom(focus, 14f));
                 }
             }
         }
