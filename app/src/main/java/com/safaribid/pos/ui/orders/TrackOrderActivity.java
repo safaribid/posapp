@@ -42,6 +42,9 @@ import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.utils.AppConfig;
+import com.safaribid.pos.utils.RouteHelper;
+
+import java.util.List;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -421,10 +424,38 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
         }
 
         if (pickup != null && dropoff != null) {
-            routeLine = googleMap.addPolyline(new PolylineOptions()
-                    .add(pickup, dropoff)
-                    .width(8f)
-                    .color(0xFF4CAF50));
+            // Remove old route
+            if (routeLine != null) {
+                routeLine.remove();
+                routeLine = null;
+            }
+
+            final LatLng origin = pickup;
+            final LatLng dest = dropoff;
+
+            RouteHelper.fetchDrivingRoute(origin, dest, new RouteHelper.Callback() {
+                @Override
+                public void onRoute(List<LatLng> points) {
+                    if (googleMap == null || isFinishing()) return;
+                    if (routeLine != null) routeLine.remove();
+                    routeLine = googleMap.addPolyline(new PolylineOptions()
+                            .addAll(points)
+                            .width(10f)
+                            .color(0xFF4CAF50)); // same green as your mockups
+                }
+
+                @Override
+                public void onError(String message) {
+                    Log.w("TrackOrder", "Route failed, using straight line: " + message);
+                    // Fallback so the map is never empty
+                    if (googleMap == null || isFinishing()) return;
+                    if (routeLine != null) routeLine.remove();
+                    routeLine = googleMap.addPolyline(new PolylineOptions()
+                            .add(origin, dest)
+                            .width(8f)
+                            .color(0xFF4CAF50));
+                }
+            });
         }
 
         DriverLocation loc = delivery.getDriverLocation();
