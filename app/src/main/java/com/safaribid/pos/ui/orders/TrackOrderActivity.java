@@ -14,6 +14,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.bumptech.glide.Glide;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -307,15 +308,31 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
         txtDropoffAddress.setText(d.dropoffSubtitle());
         txtDriverStatus.setText(d.driverStatusLabel());
 
+        Log.d(TAG, "pickupCoords=" + d.getPickupCoords()
+                + " dropoffCoords=" + d.getDropoffCoords());
+
         DriverUser du = d.getDriverUser();
         if (du != null) {
             txtDriverName.setText(du.displayName());
             txtDriverPhone.setText(du.getPhone() != null ? du.getPhone() : "—");
             txtPlate.setText(du.plateNumber());
+
+            String photo = du.getPhoto();
+            if (photo != null && !photo.trim().isEmpty()) {
+                Glide.with(this)
+                        .load(photo.trim())
+                        .circleCrop()
+                        .placeholder(R.mipmap.ic_launcher_round)
+                        .error(R.mipmap.ic_launcher_round)
+                        .into(imgDriver);
+            } else {
+                imgDriver.setImageResource(R.mipmap.ic_launcher_round);
+            }
         } else {
             txtDriverName.setText("Waiting for driver");
             txtDriverPhone.setText("—");
             txtPlate.setText("—");
+            imgDriver.setImageResource(R.mipmap.ic_launcher_round);
         }
 
         updateMapFromDelivery();
@@ -333,6 +350,11 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
         if (googleMap == null || delivery == null) return;
 
         LatLng pickup = coordsOf(delivery.getPickupCoords());
+        // Fallback to business coords if pickup coords missing
+        if (pickup == null && delivery.getBusiness() != null) {
+            pickup = coordsOf(delivery.getBusiness().getCoords());
+        }
+
         LatLng dropoff = coordsOf(delivery.getDropoffCoords());
 
         if (markerA != null) markerA.remove();

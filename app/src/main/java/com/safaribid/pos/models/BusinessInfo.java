@@ -5,6 +5,7 @@ public class BusinessInfo {
     private String uid;
     private String name;
     private String phone;
+    private GeoPoint coords;
 
     public String getId() { return id; }
     public void setId(String id) { this.id = id; }
@@ -17,4 +18,7 @@ public class BusinessInfo {
 
     public String getPhone() { return phone; }
     public void setPhone(String phone) { this.phone = phone; }
+
+    public GeoPoint getCoords() { return coords; }
+    public void setCoords(GeoPoint coords) { this.coords = coords; }
 }

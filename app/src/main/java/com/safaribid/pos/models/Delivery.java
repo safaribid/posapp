@@ -88,14 +88,14 @@ public class Delivery {
 
     public String driverStatusLabel() {
         switch (status) {
-            case 2: return "SEARCHING FOR DRIVER";
-            case 3: return "DRIVER - ACCEPTED";
-            case 4: return "DRIVER - HEADING FOR PICKUP";
-            case 5: return "DRIVER - AT PICKUP";
-            case 6: return "DRIVER - HEADING FOR DROPOFF";
-            case 7: return "DRIVER - AT DROPOFF";
-            case 8: return "DELIVERED";
-            default: return "STATUS " + status;
+            case 2: return "Searching for driver";
+            case 3: return "Driver accepted";
+            case 4: return "Driver on the way to shop";
+            case 5: return "Driver is here";
+            case 6: return "Left the shop";
+            case 7: return "At customer";
+            case 8: return "Delivered";
+            default: return "Delivery status " + status;
         }
     }
 

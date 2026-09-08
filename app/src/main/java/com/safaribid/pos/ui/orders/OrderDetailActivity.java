@@ -96,32 +96,7 @@ public class OrderDetailActivity extends AppCompatActivity {
 
                 @Override
                 public void onDeliveryStatus(String payloadJson) {
-                    runOnUiThread(() -> {
-                        try {
-                            DeliveryStatusEvent event =
-                                    new Gson().fromJson(payloadJson, DeliveryStatusEvent.class);
-                            if (event == null) return;
-
-                            Toast.makeText(
-                                    OrderDetailActivity.this,
-                                    event.getStatusLabel(),
-                                    Toast.LENGTH_SHORT
-                            ).show();
-
-                            if (event.getDeliveryId() != null) {
-                                lastDeliveryStatus = event.getStatus();
-                            }
-                            if (event.getShopOrderStatus() != null && currentOrder != null) {
-                                currentOrder.setStatus(event.getShopOrderStatus());
-                            }
-                            if (currentOrder != null) {
-                                bindOrder(currentOrder);
-                            }
-                            updateActionButtons();
-                        } catch (Exception e) {
-                            Log.e("OrderDetail", "delivery_status parse error", e);
-                        }
-                    });
+                    runOnUiThread(() -> handleDeliveryStatusPayload(payloadJson));
                 }
 
                 @Override
@@ -190,7 +165,7 @@ public class OrderDetailActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
-        SocketManager.getInstance().setOrderListener(detailSocketListener);
+        SocketManager.getInstance().addOrderListener(detailSocketListener);
     }
 
     @Override
@@ -206,7 +181,7 @@ public class OrderDetailActivity extends AppCompatActivity {
     protected void onStop() {
         super.onStop();
         // Hand listener back to list when leaving detail
-        SocketManager.getInstance().setOrderListener(null);
+        SocketManager.getInstance().removeOrderListener(detailSocketListener);
     }
 
     private void bindViews() {
@@ -262,6 +237,70 @@ public class OrderDetailActivity extends AppCompatActivity {
         }
         if (btnTrackOrder != null) {
             btnTrackOrder.setOnClickListener(v -> onTrackOrderClicked());
+        }
+    }
+
+    private void handleDeliveryStatusPayload(String payloadJson) {
+        try {
+            DeliveryStatusEvent event = gson.fromJson(payloadJson, DeliveryStatusEvent.class);
+            if (event == null) return;
+
+            // If we know deliveryId, ignore other deliveries
+            if (lastDeliveryId != null
+                    && event.getDeliveryId() != null
+                    && !lastDeliveryId.equals(event.getDeliveryId())) {
+                return;
+            }
+
+            // Remember delivery id when we first see it
+            if (event.getDeliveryId() != null) {
+                lastDeliveryId = event.getDeliveryId();
+            }
+
+            lastDeliveryStatus = event.getStatus();
+
+            // Optional: keep shop order status in sync when backend sends it
+            if (event.getShopOrderStatus() != null && currentOrder != null) {
+                currentOrder.setStatus(event.getShopOrderStatus());
+            }
+
+            // Always refresh chip + button from delivery progress
+            applyDeliveryProgressToUi();
+
+            Log.d("OrderDetail", "delivery_status applied status=" + lastDeliveryStatus
+                    + " deliveryId=" + lastDeliveryId);
+        } catch (Exception e) {
+            Log.e("OrderDetail", "delivery_status parse error", e);
+        }
+    }
+
+    private void applyDeliveryProgressToUi() {
+        if (currentOrder == null) return;
+
+        String label = null;
+        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
+            label = deliveryStatusLabel(lastDeliveryStatus);
+        }
+
+        if (label != null && txtStatusChip != null) {
+            txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
+        } else if (txtStatusChip != null) {
+            txtStatusChip.setText(currentOrder.getStatusLabel().toUpperCase(Locale.getDefault()));
+        }
+
+        updateActionButtons(); // uses lastDeliveryStatus for disable + button text
+    }
+
+    private static String deliveryStatusLabel(int deliveryStatus) {
+        switch (deliveryStatus) {
+            case 2: return "Searching for driver";
+            case 3: return "Driver accepted";
+            case 4: return "Driver on the way to shop";
+            case 5: return "Driver is here";
+            case 6: return "Left the shop";
+            case 7: return "At customer";
+            case 8: return "Delivered";
+            default: return "Delivery status " + deliveryStatus;
         }
     }
 
@@ -375,15 +414,7 @@ public class OrderDetailActivity extends AppCompatActivity {
         txtPaymentRef.setText(ref != null && !ref.trim().isEmpty() ? "Ref: " + ref.trim() : "Ref: —");
 
         // Chip text after bind:
-        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
-            String dLabel = Order.deliveryProgressLabel(lastDeliveryStatus);
-            if (dLabel != null) {
-                txtStatusChip.setText(dLabel.toUpperCase(Locale.getDefault()));
-            }
-        } else {
-            txtStatusChip.setText(order.getStatusLabel().toUpperCase(Locale.getDefault()));
-        }
-        updateActionButtons();
+        applyDeliveryProgressToUi();
     }
 
     private void addOrderItemRow(int index, OrderItem item) {
@@ -441,8 +472,7 @@ public class OrderDetailActivity extends AppCompatActivity {
         btnPrimaryAction.setVisibility(View.VISIBLE);
 
         if (driverLocked) {
-            String label = Order.deliveryProgressLabel(lastDeliveryStatus);
-            if (label == null) label = currentOrder.getStatusLabel();
+            String label = deliveryStatusLabel(lastDeliveryStatus);
             btnPrimaryAction.setText(label);
             btnPrimaryAction.setEnabled(false);
             if (txtStatusChip != null) {

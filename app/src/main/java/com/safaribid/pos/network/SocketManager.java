@@ -9,7 +9,9 @@ import com.safaribid.pos.utils.AppConfig;
 import org.json.JSONObject;
 
 import java.net.URISyntaxException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import io.socket.client.IO;
@@ -36,7 +38,7 @@ public class SocketManager {
     private boolean intentionallyDisconnected = false;
 
     private ConnectionListener connectionListener;
-    private OrderListener orderListener;
+    private final List<OrderListener> orderListeners = new ArrayList<>();
 
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Handler pingHandler = new Handler(Looper.getMainLooper());
@@ -83,8 +85,35 @@ public class SocketManager {
         this.connectionListener = listener;
     }
 
+    public void addOrderListener(OrderListener listener) {
+        if (listener == null) return;
+        synchronized (orderListeners) {
+            if (!orderListeners.contains(listener)) {
+                orderListeners.add(listener);
+            }
+        }
+    }
+
+    public void removeOrderListener(OrderListener listener) {
+        synchronized (orderListeners) {
+            orderListeners.remove(listener);
+        }
+    }
+
+    /** Legacy support */
     public void setOrderListener(OrderListener listener) {
-        this.orderListener = listener;
+        synchronized (orderListeners) {
+            orderListeners.clear();
+            if (listener != null) {
+                orderListeners.add(listener);
+            }
+        }
+    }
+
+    public OrderListener getOrderListener() {
+        synchronized (orderListeners) {
+            return orderListeners.isEmpty() ? null : orderListeners.get(0);
+        }
     }
 
     /**
@@ -240,8 +269,10 @@ public class SocketManager {
             final String json = firstArgToString(args);
             Log.d(TAG, "order_request: " + json);
             mainHandler.post(() -> {
-                if (orderListener != null && json != null) {
-                    orderListener.onOrderRequest(json);
+                synchronized (orderListeners) {
+                    for (OrderListener listener : new ArrayList<>(orderListeners)) {
+                        listener.onOrderRequest(json);
+                    }
                 }
             });
         });
@@ -250,8 +281,10 @@ public class SocketManager {
             final String json = firstArgToString(args);
             Log.d(TAG, "delivery_status: " + json);
             mainHandler.post(() -> {
-                if (orderListener != null && json != null) {
-                    orderListener.onDeliveryStatus(json);
+                synchronized (orderListeners) {
+                    for (OrderListener listener : new ArrayList<>(orderListeners)) {
+                        listener.onDeliveryStatus(json);
+                    }
                 }
             });
         });
@@ -260,8 +293,10 @@ public class SocketManager {
             final String json = firstArgToString(args);
             Log.d(TAG, "driver_location: " + json);
             mainHandler.post(() -> {
-                if (orderListener != null && json != null) {
-                    orderListener.onDriverLocation(json);
+                synchronized (orderListeners) {
+                    for (OrderListener listener : new ArrayList<>(orderListeners)) {
+                        listener.onDriverLocation(json);
+                    }
                 }
             });
         });

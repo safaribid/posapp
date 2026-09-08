@@ -191,7 +191,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         updateFilterButtonStyles();
 
         // Socket
-        SocketManager.getInstance().setOrderListener(this);
+        SocketManager.getInstance().addOrderListener(this);
         String uid = authManager.getUserId();
         if (uid != null && !uid.isEmpty()) {
             SocketManager.getInstance().connect(uid);
@@ -232,13 +232,14 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     @Override
     protected void onStart() {
         super.onStart();
-        SocketManager.getInstance().setOrderListener(this);
+        SocketManager.getInstance().addOrderListener(this);
     }
 
     @Override
     protected void onStop() {
         super.onStop();
-        // Option: SocketManager.getInstance().setOrderListener(null);
+        // Keep listening in background if desired, or remove if not
+        // SocketManager.getInstance().removeOrderListener(this);
     }
 
     private void setupSearch() {
@@ -647,6 +648,6 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        SocketManager.getInstance().setOrderListener(null);
+        SocketManager.getInstance().removeOrderListener(this);
     }
 }
