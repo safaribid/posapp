@@ -4,6 +4,7 @@ import android.Manifest;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
@@ -26,11 +27,13 @@ import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.models.Delivery;
+import com.safaribid.pos.models.DeliveryListResponse;
 import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
 import com.safaribid.pos.models.OrderUpdateResponse;
 import com.safaribid.pos.models.ShippingAddress;
+import com.safaribid.pos.models.TrackDeliveryResponse;
 import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
@@ -155,8 +158,7 @@ public class OrderDetailActivity extends AppCompatActivity {
         printer = PrinterFactory.createDefault(this);
 
         if (currentOrder != null) {
-            bindOrder(currentOrder);
-            updateActionButtons();
+            afterOrderBound();
         } else {
             loadOrder(orderId); // HTTP fetch — required for FCM path
         }
@@ -277,31 +279,109 @@ public class OrderDetailActivity extends AppCompatActivity {
     private void applyDeliveryProgressToUi() {
         if (currentOrder == null) return;
 
-        String label = null;
         if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
-            label = deliveryStatusLabel(lastDeliveryStatus);
-        }
-
-        if (label != null && txtStatusChip != null) {
-            txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
+            String label = deliveryStatusLabel(lastDeliveryStatus);
+            if (txtStatusChip != null) {
+                txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
+            }
         } else if (txtStatusChip != null) {
             txtStatusChip.setText(currentOrder.getStatusLabel().toUpperCase(Locale.getDefault()));
         }
-
-        updateActionButtons(); // uses lastDeliveryStatus for disable + button text
+        updateActionButtons();
     }
 
-    private static String deliveryStatusLabel(int deliveryStatus) {
-        switch (deliveryStatus) {
+    private static String deliveryStatusLabel(int s) {
+        switch (s) {
             case 2: return "Searching for driver";
             case 3: return "Driver accepted";
-            case 4: return "Driver on the way to shop";
+            case 4: return "Driver heading for pickup";
             case 5: return "Driver is here";
             case 6: return "Left the shop";
             case 7: return "At customer";
             case 8: return "Delivered";
-            default: return "Delivery status " + deliveryStatus;
+            default: return "Delivery status " + s;
         }
+    }
+
+    private void afterOrderBound() {
+        if (currentOrder == null) return;
+
+        bindOrder(currentOrder); // your existing bind
+
+        if (currentOrder.getStatus() >= 5 && currentOrder.getStatus() < 9) {
+            // Prefer known delivery id; else find by shop order id
+            if (lastDeliveryId != null && !lastDeliveryId.isEmpty()) {
+                fetchDeliveryAndApply(lastDeliveryId);
+            } else {
+                findDeliveryForShopOrder(currentOrder.getId());
+            }
+        } else {
+            lastDeliveryStatus = null;
+            updateActionButtons();
+        }
+    }
+
+    private void fetchDeliveryAndApply(String deliveryId) {
+        String token = authManager.getBearerToken();
+        String uid = authManager.getUserId();
+        if (token == null || uid == null) return;
+
+        String url = AppConfig.serverOrigin()
+                + "/api/business/deliveries/view?uid="
+                + Uri.encode(uid)
+                + "&id="
+                + Uri.encode(deliveryId);
+
+        ApiClient.getApiService().getBusinessDelivery(token, url)
+                .enqueue(new Callback<TrackDeliveryResponse>() {
+                    @Override
+                    public void onResponse(@NonNull Call<TrackDeliveryResponse> call,
+                                           @NonNull Response<TrackDeliveryResponse> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
+                            Delivery d = response.body().getData();
+                            lastDeliveryId = d.getId();
+                            lastDeliveryStatus = d.getStatus();
+                            applyDeliveryProgressToUi();
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<TrackDeliveryResponse> call, @NonNull Throwable t) {
+                    }
+                });
+    }
+
+    private void findDeliveryForShopOrder(String shopOrderId) {
+        String token = authManager.getBearerToken();
+        String uid = authManager.getUserId();
+        if (token == null || uid == null) return;
+
+        String url = AppConfig.serverOrigin()
+                + "/api/business/deliveries?uid="
+                + Uri.encode(uid)
+                + "&limit=50";
+
+        ApiClient.getApiService().getBusinessDeliveries(token, url)
+                .enqueue(new Callback<DeliveryListResponse>() {
+                    @Override
+                    public void onResponse(@NonNull Call<DeliveryListResponse> call,
+                                           @NonNull Response<DeliveryListResponse> response) {
+                        if (response.isSuccessful() && response.body() != null && response.body().getData() != null) {
+                            for (Delivery d : response.body().getData()) {
+                                if (shopOrderId.equals(d.getShopOrderId())) {
+                                    lastDeliveryId = d.getId();
+                                    lastDeliveryStatus = d.getStatus();
+                                    applyDeliveryProgressToUi();
+                                    return;
+                                }
+                            }
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(@NonNull Call<DeliveryListResponse> call, @NonNull Throwable t) {
+                    }
+                });
     }
 
     private void loadOrder(String id) {
@@ -324,8 +404,7 @@ public class OrderDetailActivity extends AppCompatActivity {
                 if (response.isSuccessful() && response.body() != null) {
                     currentOrder = response.body();
                     orderId = currentOrder.getId();
-                    bindOrder(currentOrder);
-                    updateActionButtons();
+                    afterOrderBound();
                 } else {
                     Toast.makeText(OrderDetailActivity.this, "Failed to load order", Toast.LENGTH_LONG).show();
                 }
@@ -454,9 +533,6 @@ public class OrderDetailActivity extends AppCompatActivity {
 
         int status = currentOrder.getStatus();
 
-        // Driver has accepted or later → lock vendor actions
-        boolean driverLocked = lastDeliveryStatus != null && lastDeliveryStatus >= 3;
-
         if (layoutNewOrderActions != null) {
             boolean isNew = status == 2;
             layoutNewOrderActions.setVisibility(isNew ? View.VISIBLE : View.GONE);
@@ -469,17 +545,17 @@ public class OrderDetailActivity extends AppCompatActivity {
             return;
         }
 
-        btnPrimaryAction.setVisibility(View.VISIBLE);
-
-        if (driverLocked) {
-            String label = deliveryStatusLabel(lastDeliveryStatus);
-            btnPrimaryAction.setText(label);
+        if (lastDeliveryStatus != null && lastDeliveryStatus >= 3) {
+            btnPrimaryAction.setVisibility(View.VISIBLE);
+            btnPrimaryAction.setText(deliveryStatusLabel(lastDeliveryStatus));
             btnPrimaryAction.setEnabled(false);
             if (txtStatusChip != null) {
-                txtStatusChip.setText(label.toUpperCase(Locale.getDefault()));
+                txtStatusChip.setText(deliveryStatusLabel(lastDeliveryStatus).toUpperCase(Locale.getDefault()));
             }
             return;
         }
+
+        btnPrimaryAction.setVisibility(View.VISIBLE);
 
         switch (status) {
             case 3:
