@@ -343,6 +343,7 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
 
         DriverUser du = d.getDriverUser();
         if (du != null) {
+            Log.d(TAG, "profile=" + (du.getProfile() != null ? du.getProfile().toString() : "null"));
             txtDriverName.setText(du.displayName());
             txtDriverPhone.setText(du.getPhone() != null ? du.getPhone() : "—");
             txtPlate.setText(du.plateNumber());

@@ -43,26 +43,50 @@ public class DriverUser {
 
     public String plateNumber() {
         if (profile == null) return "—";
-        String[] keys = {
+
+        // 1) Direct keys on profile (rare)
+        String direct = firstString(profile,
                 "plate", "plate_number", "number_plate", "vehicle_plate",
-                "reg_number", "registration", "vehicle_reg"
-        };
-        for (String k : keys) {
-            if (profile.has(k) && !profile.get(k).isJsonNull()) {
-                String v = profile.get(k).getAsString();
-                if (v != null && !v.trim().isEmpty()) return v.trim();
-            }
+                "reg_number", "registration");
+        if (direct != null) return direct;
+
+        // 2) vehicle_details.plate  ← actual backend shape
+        if (profile.has("vehicle_details") && profile.get("vehicle_details").isJsonObject()) {
+            JsonObject details = profile.getAsJsonObject("vehicle_details");
+            String plate = firstString(details,
+                    "plate", "plate_number", "number_plate", "reg_number");
+            if (plate != null) return plate;
         }
-        // nested vehicle object
+
+        // 3) vehicle_info (older / alternate)
+        if (profile.has("vehicle_info") && profile.get("vehicle_info").isJsonObject()) {
+            JsonObject info = profile.getAsJsonObject("vehicle_info");
+            String plate = firstString(info,
+                    "plate", "plate_number", "number_plate", "reg_number");
+            if (plate != null) return plate;
+        }
+
+        // 4) nested vehicle { plate }
         if (profile.has("vehicle") && profile.get("vehicle").isJsonObject()) {
             JsonObject v = profile.getAsJsonObject("vehicle");
-            for (String k : keys) {
-                if (v.has(k) && !v.get(k).isJsonNull()) {
-                    String s = v.get(k).getAsString();
-                    if (s != null && !s.trim().isEmpty()) return s.trim();
+            String plate = firstString(v, "plate", "plate_number", "number_plate");
+            if (plate != null) return plate;
+        }
+
+        return "—";
+    }
+
+    private static String firstString(JsonObject o, String... keys) {
+        if (o == null) return null;
+        for (String k : keys) {
+            if (o.has(k) && !o.get(k).isJsonNull()) {
+                try {
+                    String v = o.get(k).getAsString();
+                    if (v != null && !v.trim().isEmpty()) return v.trim();
+                } catch (Exception ignored) {
                 }
             }
         }
-        return "—";
+        return null;
     }
 }
