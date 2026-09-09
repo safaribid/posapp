@@ -34,6 +34,8 @@ import com.google.gson.Gson;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.auth.LoginActivity;
+import com.safaribid.pos.models.Delivery;
+import com.safaribid.pos.models.DeliveryListResponse;
 import com.safaribid.pos.models.DeliveryProgressStore;
 import com.safaribid.pos.models.DeliveryStatusEvent;
 import com.safaribid.pos.models.Order;
@@ -44,6 +46,7 @@ import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.notifications.NotificationHelper;
 import com.safaribid.pos.printer.PrinterPickerActivity;
+import com.safaribid.pos.utils.AppConfig;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -233,6 +236,10 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     protected void onStart() {
         super.onStart();
         SocketManager.getInstance().addOrderListener(this);
+        // Refresh delivery labels when coming back from detail
+        if (!allOrders.isEmpty()) {
+            seedDeliveryProgress();
+        }
     }
 
     @Override
@@ -329,6 +336,9 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                         allOrders.addAll(orders);
                     }
                     applyFilters();
+
+                    // Seed delivery progress so list chips match detail (cold start)
+                    seedDeliveryProgress();
 
                     if (!allOrders.isEmpty()) {
                         recyclerView.setVisibility(View.VISIBLE);
@@ -661,6 +671,84 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         } catch (Exception e) {
             Log.e(TAG, "Failed to play sound", e);
         }
+    }
+
+    /**
+     * Load recent business deliveries and map shop_order_id → delivery status
+     * into DeliveryProgressStore so list chips show "Driver heading for pickup"
+     * etc., not only shop order "Ready for Pickup".
+     */
+    private void seedDeliveryProgress() {
+        String token = authManager.getBearerToken();
+        String userId = authManager.getUserId();
+        if (token == null || userId == null) return;
+
+        // Only need progress for orders that may have a delivery
+        boolean anyReadyOrBeyond = false;
+        for (Order o : allOrders) {
+            int s = o.getStatus();
+            if (s >= 5 && s <= 8) {
+                anyReadyOrBeyond = true;
+                break;
+            }
+        }
+        if (!anyReadyOrBeyond) return;
+
+        String url = AppConfig.serverOrigin()
+                + "/api/business/deliveries?uid="
+                + Uri.encode(userId)
+                + "&limit=50";
+
+        ApiClient.getApiService().getBusinessDeliveries(token, url)
+                .enqueue(new Callback<DeliveryListResponse>() {
+                    @Override
+                    public void onResponse(
+                            Call<DeliveryListResponse> call,
+                            Response<DeliveryListResponse> response) {
+
+                        if (!response.isSuccessful()
+                                || response.body() == null
+                                || response.body().getData() == null) {
+                            Log.w(TAG, "seedDeliveryProgress failed code=" + response.code());
+                            return;
+                        }
+
+                        int seeded = 0;
+                        for (Delivery d : response.body().getData()) {
+                            if (d == null) continue;
+
+                            String shopOrderId = d.getShopOrderId();
+                            // Fallback if API nests shop_order
+                            if ((shopOrderId == null || shopOrderId.isEmpty())
+                                    && d.getShopOrder() != null) {
+                                shopOrderId = d.getShopOrder().getId();
+                            }
+
+                            int ds = d.getStatus();
+                            // Store only meaningful progress (store itself also filters 9–10)
+                            if (shopOrderId != null && !shopOrderId.isEmpty()
+                                    && ds >= 2 && ds <= 8) {
+                                DeliveryProgressStore.get().put(
+                                        shopOrderId,
+                                        d.getId(),
+                                        ds
+                                );
+                                seeded++;
+                            }
+                        }
+
+                        Log.d(TAG, "seedDeliveryProgress seeded=" + seeded);
+                        // Refresh chips without re-fetching orders
+                        applyFilters();
+                    }
+
+                    @Override
+                    public void onFailure(
+                            Call<DeliveryListResponse> call,
+                            Throwable t) {
+                        Log.e(TAG, "seedDeliveryProgress network", t);
+                    }
+                });
     }
 
     @Override
