@@ -6,7 +6,8 @@ public class PrinterFactory {
 
     public enum Type {
         BUILT_IN_SM1,
-        EXTERNAL_BLUETOOTH
+        /** Built-in or bonded printer via Bluetooth SPP */
+        BLUETOOTH
     }
 
     private static final String PREFS = "safaribid_printer_prefs";
@@ -34,11 +35,13 @@ public class PrinterFactory {
     public static Type getPreferredType(Context context) {
         String saved = context.getApplicationContext()
                 .getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-                .getString(KEY_TYPE, Type.BUILT_IN_SM1.name()); // default to SM1 if you prefer
+                .getString(KEY_TYPE, Type.BLUETOOTH.name());
         try {
+            // migrate old name
+            if ("EXTERNAL_BLUETOOTH".equals(saved)) return Type.BLUETOOTH;
             return Type.valueOf(saved);
         } catch (Exception e) {
-            return Type.BUILT_IN_SM1;
+            return Type.BLUETOOTH;
         }
     }
 }

@@ -110,19 +110,23 @@ public class OrderDetailActivity extends AppCompatActivity {
             };
 
     private final ActivityResultLauncher<Intent> printerPickerLauncher =
-            registerForActivityResult(new ActivityResultContracts.StartActivityForResult(), result -> {
-                if (result.getResultCode() == RESULT_OK && result.getData() != null) {
-                    String mac = result.getData().getStringExtra(PrinterPickerActivity.EXTRA_PRINTER_MAC);
-                    String name = result.getData().getStringExtra(PrinterPickerActivity.EXTRA_PRINTER_NAME);
-
-                    if (mac != null && !mac.isEmpty()) {
-                        Toast.makeText(this, "Selected: " + (name != null ? name : mac), Toast.LENGTH_SHORT).show();
-                        PrinterFactory.setPreferredType(this, PrinterFactory.Type.EXTERNAL_BLUETOOTH);
-                        printer = PrinterFactory.create(this, PrinterFactory.Type.EXTERNAL_BLUETOOTH);
-                        connectAndPrint(mac);
-                    }
-                }
-            });
+            registerForActivityResult(
+                    new ActivityResultContracts.StartActivityForResult(),
+                    result -> {
+                        if (result.getResultCode() == RESULT_OK && result.getData() != null) {
+                            String mac = result.getData()
+                                    .getStringExtra(PrinterPickerActivity.EXTRA_PRINTER_MAC);
+                            String name = result.getData()
+                                    .getStringExtra(PrinterPickerActivity.EXTRA_PRINTER_NAME);
+                            if (mac != null) {
+                                PrinterPrefs.saveLastPrinter(this, mac, name);
+                                PrinterFactory.setPreferredType(this, PrinterFactory.Type.BLUETOOTH);
+                                printer = PrinterFactory.create(this, PrinterFactory.Type.BLUETOOTH);
+                                // Retry print with explicit MAC
+                                connectAndPrint(mac);
+                            }
+                        }
+                    });
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -156,7 +160,8 @@ public class OrderDetailActivity extends AppCompatActivity {
         bindViews();
         setupClickListeners();
 
-        printer = PrinterFactory.createDefault(this);
+        PrinterFactory.setPreferredType(this, PrinterFactory.Type.BLUETOOTH);
+        printer = PrinterFactory.create(this, PrinterFactory.Type.BLUETOOTH);
 
         if (currentOrder != null) {
             afterOrderBound();
@@ -709,85 +714,50 @@ public class OrderDetailActivity extends AppCompatActivity {
 
     private void onPrintClicked() {
         if (currentOrder == null) {
-            Toast.makeText(this, "Order not loaded yet", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "No order to print", Toast.LENGTH_SHORT).show();
             return;
         }
-
-        PrinterFactory.Type type = PrinterFactory.getPreferredType(this);
-
-        if (type == PrinterFactory.Type.EXTERNAL_BLUETOOTH) {
-            if (!hasBluetoothPermission()) {
-                requestBluetoothPermission();
-                return;
-            }
-
-            String lastMac = PrinterPrefs.getLastMac(this);
-            if (lastMac != null && !lastMac.isEmpty()) {
-                connectAndPrint(lastMac);
-            } else {
-                openPrinterPicker();
-            }
-        } else {
-            connectAndPrint(null);
-        }
-    }
-
-    private void openPrinterPicker() {
         if (!hasBluetoothPermission()) {
             requestBluetoothPermission();
             return;
         }
-        Intent intent = new Intent(this, PrinterPickerActivity.class);
-        printerPickerLauncher.launch(intent);
+        // Auto path first (saved MAC or discover)
+        connectAndPrint(null);
     }
 
+    /**
+     * @param mac null = auto connect; non-null = explicit after manual pick
+     */
     private void connectAndPrint(String mac) {
-        if (btnPrint != null) {
-            btnPrint.setEnabled(false);
-            btnPrint.setText("Connecting…");
+        if (printer == null) {
+            printer = PrinterFactory.create(this, PrinterFactory.Type.BLUETOOTH);
         }
 
-        IPrinter.ConnectionCallback callback = new IPrinter.ConnectionCallback() {
+        Toast.makeText(this, "Connecting to printer…", Toast.LENGTH_SHORT).show();
+
+        IPrinter.ConnectionCallback cb = new IPrinter.ConnectionCallback() {
             @Override
             public void onConnected() {
-                runOnUiThread(() -> {
-                    if (btnPrint != null) btnPrint.setText("Printing…");
-                    doPrintReceipt();
-                });
+                doPrintReceipt();
             }
 
             @Override
             public void onConnectionFailed(String error) {
-                runOnUiThread(() -> {
-                    if (btnPrint != null) {
-                        btnPrint.setEnabled(true);
-                        btnPrint.setText("Print Receipt");
-                    }
-                    Toast.makeText(OrderDetailActivity.this,
-                            "Could not connect: " + error, Toast.LENGTH_LONG).show();
-
-                    if (PrinterFactory.getPreferredType(OrderDetailActivity.this)
-                            == PrinterFactory.Type.EXTERNAL_BLUETOOTH) {
-                        openPrinterPicker();
-                    }
-                });
+                Toast.makeText(OrderDetailActivity.this,
+                        "Auto connect failed. Select printer…",
+                        Toast.LENGTH_LONG).show();
+                openPrinterPicker();
             }
 
             @Override
             public void onDisconnected() {
-                runOnUiThread(() -> {
-                    if (btnPrint != null) {
-                        btnPrint.setEnabled(true);
-                        btnPrint.setText("Print Receipt");
-                    }
-                });
             }
         };
 
-        if (mac != null) {
-            printer.connect(mac, callback);
+        if (mac != null && !mac.isEmpty()) {
+            printer.connect(mac, cb);
         } else {
-            printer.connect(callback);
+            printer.connect(cb); // auto
         }
     }
 
@@ -803,34 +773,27 @@ public class OrderDetailActivity extends AppCompatActivity {
             printer.printBitmap(receiptBitmap, new IPrinter.PrintCallback() {
                 @Override
                 public void onSuccess() {
-                    runOnUiThread(() -> {
-                        Toast.makeText(OrderDetailActivity.this, "Receipt printed", Toast.LENGTH_SHORT).show();
-                        if (btnPrint != null) {
-                            btnPrint.setEnabled(true);
-                            btnPrint.setText("Print Receipt");
-                        }
-                    });
+                    Toast.makeText(OrderDetailActivity.this,
+                            "Receipt printed", Toast.LENGTH_SHORT).show();
+                    printer.disconnect();
                 }
 
                 @Override
                 public void onError(String message) {
-                    runOnUiThread(() -> {
-                        Toast.makeText(OrderDetailActivity.this,
-                                "Print failed: " + message, Toast.LENGTH_LONG).show();
-                        if (btnPrint != null) {
-                            btnPrint.setEnabled(true);
-                            btnPrint.setText("Print Receipt");
-                        }
-                    });
+                    Toast.makeText(OrderDetailActivity.this,
+                            "Print error: " + message, Toast.LENGTH_LONG).show();
+                    printer.disconnect();
                 }
             });
         } catch (Exception e) {
-            if (btnPrint != null) {
-                btnPrint.setEnabled(true);
-                btnPrint.setText("Print Receipt");
-            }
-            Toast.makeText(this, "Print failed: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            Toast.makeText(this, "Print prepare failed: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
         }
+    }
+
+    private void openPrinterPicker() {
+        Intent intent = new Intent(this, PrinterPickerActivity.class);
+        printerPickerLauncher.launch(intent);
     }
 
     private void onTrackOrderClicked() {

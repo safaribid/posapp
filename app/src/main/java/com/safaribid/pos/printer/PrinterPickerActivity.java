@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Shows already-paired Bluetooth devices.
- * User selects one → MAC is saved and returned to the caller.
+ * Manual fallback: list bonded Bluetooth devices.
+ * User selects one → MAC saved for this device → returned to caller.
  */
 public class PrinterPickerActivity extends AppCompatActivity {
 
@@ -50,7 +50,7 @@ public class PrinterPickerActivity extends AppCompatActivity {
         setContentView(R.layout.activity_printer_picker);
 
         if (getSupportActionBar() != null) {
-            getSupportActionBar().setTitle("Select Printer");
+            getSupportActionBar().setTitle("Select printer");
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
         }
 
@@ -76,15 +76,14 @@ public class PrinterPickerActivity extends AppCompatActivity {
                     Manifest.permission.BLUETOOTH_CONNECT,
                     Manifest.permission.BLUETOOTH_SCAN
             };
-
             boolean allGranted = true;
             for (String p : perms) {
-                if (ContextCompat.checkSelfPermission(this, p) != PackageManager.PERMISSION_GRANTED) {
+                if (ContextCompat.checkSelfPermission(this, p)
+                        != PackageManager.PERMISSION_GRANTED) {
                     allGranted = false;
                     break;
                 }
             }
-
             if (!allGranted) {
                 ActivityCompat.requestPermissions(this, perms, REQ_BT_PERMISSIONS);
                 return;
@@ -98,7 +97,6 @@ public class PrinterPickerActivity extends AppCompatActivity {
                                            @NonNull String[] permissions,
                                            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-
         if (requestCode == REQ_BT_PERMISSIONS) {
             boolean granted = grantResults.length > 0;
             for (int result : grantResults) {
@@ -107,7 +105,6 @@ public class PrinterPickerActivity extends AppCompatActivity {
                     break;
                 }
             }
-
             if (granted) {
                 loadPairedDevices();
             } else {
@@ -125,7 +122,6 @@ public class PrinterPickerActivity extends AppCompatActivity {
             emptyView.setText("Bluetooth is not supported on this device");
             return;
         }
-
         if (!bluetoothAdapter.isEnabled()) {
             emptyView.setText("Please turn on Bluetooth first");
             Toast.makeText(this, "Bluetooth is turned off", Toast.LENGTH_SHORT).show();
@@ -134,9 +130,11 @@ public class PrinterPickerActivity extends AppCompatActivity {
 
         try {
             Set<BluetoothDevice> bonded = bluetoothAdapter.getBondedDevices();
-
             if (bonded == null || bonded.isEmpty()) {
-                emptyView.setText("No paired devices found.\n\nPair your printer in system Bluetooth settings first, then tap Refresh.");
+                emptyView.setText(
+                        "No paired devices found.\n\n"
+                                + "On most POS units the built-in printer appears under "
+                                + "system Bluetooth. Pair it if needed, then tap Refresh.");
                 return;
             }
 
@@ -146,7 +144,6 @@ public class PrinterPickerActivity extends AppCompatActivity {
                 adapter.add(name + "\n" + device.getAddress());
             }
             adapter.notifyDataSetChanged();
-
         } catch (SecurityException e) {
             Toast.makeText(this, "Missing Bluetooth permission", Toast.LENGTH_LONG).show();
         }
@@ -159,8 +156,8 @@ public class PrinterPickerActivity extends AppCompatActivity {
         String mac = device.getAddress();
         String name = device.getName() != null ? device.getName() : "Printer";
 
-        // Save as last used printer
         PrinterPrefs.saveLastPrinter(this, mac, name);
+        PrinterFactory.setPreferredType(this, PrinterFactory.Type.BLUETOOTH);
 
         Intent result = new Intent();
         result.putExtra(EXTRA_PRINTER_MAC, mac);

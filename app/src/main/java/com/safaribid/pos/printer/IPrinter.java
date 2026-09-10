@@ -15,16 +15,15 @@ public interface IPrinter {
         void onDisconnected();
     }
 
-    /** SM1 – no MAC needed */
+    /** Built-in SM1 or auto BT — no MAC argument */
     void connect(ConnectionCallback callback);
 
-    /** Bluetooth – needs MAC */
+    /** Explicit MAC (after manual pick or saved address) */
     void connect(String macAddress, ConnectionCallback callback);
 
     boolean isConnected();
 
     void disconnect();
 
-    /** Common print method used by both printers */
     void printBitmap(Bitmap bitmap, PrintCallback callback);
 }

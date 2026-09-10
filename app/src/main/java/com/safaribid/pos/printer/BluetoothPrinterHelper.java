@@ -13,14 +13,21 @@ import com.safaribid.pos.utils.PrintUtil;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+/**
+ * Built-in (or bonded) printer over Classic Bluetooth SPP.
+ * connect() = auto: saved MAC → best bonded candidate.
+ * connect(mac) = explicit address after manual selection.
+ */
 public class BluetoothPrinterHelper implements IPrinter {
 
     private static final String TAG = "BluetoothPrinterHelper";
-    private static final UUID SPP_UUID = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
+    private static final UUID SPP_UUID =
+            UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private final Context context;
     private final BluetoothAdapter bluetoothAdapter;
@@ -30,15 +37,66 @@ public class BluetoothPrinterHelper implements IPrinter {
     private BluetoothSocket socket;
     private OutputStream outputStream;
     private boolean isConnected = false;
+    private String connectedMac;
+    private String connectedName;
 
     public BluetoothPrinterHelper(Context context) {
         this.context = context.getApplicationContext();
         this.bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
     }
 
+    /** Auto: last saved MAC, then ranked bonded devices. */
     @Override
     public void connect(ConnectionCallback callback) {
-        notifyFailed(callback, "MAC address required for Bluetooth printer");
+        executor.execute(() -> {
+            if (bluetoothAdapter == null) {
+                notifyFailed(callback, "Bluetooth not supported");
+                return;
+            }
+            if (!bluetoothAdapter.isEnabled()) {
+                notifyFailed(callback, "Please turn on Bluetooth");
+                return;
+            }
+
+            // 1) Saved MAC on this device
+            String lastMac = PrinterPrefs.getLastMac(context);
+            if (lastMac != null && !lastMac.isEmpty()) {
+                if (tryConnectBlocking(lastMac)) {
+                    notifyConnected(callback);
+                    return;
+                }
+                Log.w(TAG, "Saved MAC failed, trying auto-discover");
+            }
+
+            // 2) Ranked bonded candidates
+            List<BluetoothDevice> candidates =
+                    InternalPrinterFinder.rankedBondedPrinters(bluetoothAdapter);
+            if (candidates.isEmpty()) {
+                notifyFailed(callback,
+                        "No paired Bluetooth devices. Pair the printer or select manually.");
+                return;
+            }
+
+            for (BluetoothDevice device : candidates) {
+                String mac = device.getAddress();
+                if (mac == null) continue;
+                if (tryConnectBlocking(mac)) {
+                    String name;
+                    try {
+                        name = device.getName() != null ? device.getName() : "Printer";
+                    } catch (SecurityException e) {
+                        name = "Printer";
+                    }
+                    PrinterPrefs.saveLastPrinter(context, mac, name);
+                    connectedName = name;
+                    notifyConnected(callback);
+                    return;
+                }
+            }
+
+            notifyFailed(callback,
+                    "Could not connect automatically. Select the printer manually.");
+        });
     }
 
     @Override
@@ -48,31 +106,47 @@ public class BluetoothPrinterHelper implements IPrinter {
             return;
         }
 
+        final String mac = macAddress.trim();
         executor.execute(() -> {
-            try {
-                closeQuietly();
-
-                BluetoothDevice device = bluetoothAdapter.getRemoteDevice(macAddress.trim());
-                if (bluetoothAdapter.isDiscovering()) {
-                    bluetoothAdapter.cancelDiscovery();
-                }
-
-                socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
-                socket.connect();
-                outputStream = socket.getOutputStream();
-                isConnected = true;
-
-                write(EscPosCommands.INIT);
-
-                mainHandler.post(() -> {
-                    if (callback != null) callback.onConnected();
-                });
-            } catch (IOException e) {
-                Log.e(TAG, "Connection failed", e);
-                closeQuietly();
-                notifyFailed(callback, e.getMessage() != null ? e.getMessage() : "Connection failed");
+            if (tryConnectBlocking(mac)) {
+                String name = PrinterPrefs.getLastName(context);
+                if (name == null || name.isEmpty()) name = "Printer";
+                PrinterPrefs.saveLastPrinter(context, mac, name);
+                notifyConnected(callback);
+            } else {
+                notifyFailed(callback, "Connection failed for " + mac);
             }
         });
+    }
+
+    private boolean tryConnectBlocking(String mac) {
+        try {
+            closeQuietly();
+
+            if (bluetoothAdapter.isDiscovering()) {
+                bluetoothAdapter.cancelDiscovery();
+            }
+
+            BluetoothDevice device = bluetoothAdapter.getRemoteDevice(mac);
+            socket = device.createInsecureRfcommSocketToServiceRecord(SPP_UUID);
+            socket.connect();
+            outputStream = socket.getOutputStream();
+            isConnected = true;
+            connectedMac = mac;
+            try {
+                connectedName = device.getName() != null ? device.getName() : "Printer";
+            } catch (SecurityException e) {
+                connectedName = "Printer";
+            }
+
+            write(EscPosCommands.INIT);
+            Log.d(TAG, "Connected to " + connectedName + " " + mac);
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "tryConnect failed mac=" + mac, e);
+            closeQuietly();
+            return false;
+        }
     }
 
     @Override
@@ -88,15 +162,15 @@ public class BluetoothPrinterHelper implements IPrinter {
     @Override
     public void printBitmap(Bitmap bitmap, PrintCallback callback) {
         if (!isConnected()) {
-            if (callback != null) {
-                mainHandler.post(() -> callback.onError("Printer not connected"));
-            }
+            mainHandler.post(() -> {
+                if (callback != null) callback.onError("Printer not connected");
+            });
             return;
         }
         if (bitmap == null) {
-            if (callback != null) {
-                mainHandler.post(() -> callback.onError("Receipt image is empty"));
-            }
+            mainHandler.post(() -> {
+                if (callback != null) callback.onError("Receipt image is empty");
+            });
             return;
         }
 
@@ -113,13 +187,20 @@ public class BluetoothPrinterHelper implements IPrinter {
                 write("\n\n".getBytes());
                 write(EscPosCommands.PARTIAL_CUT);
 
+                // Remember successful printer on this device
+                if (connectedMac != null) {
+                    PrinterPrefs.saveLastPrinter(context, connectedMac, connectedName);
+                }
+
                 mainHandler.post(() -> {
                     if (callback != null) callback.onSuccess();
                 });
             } catch (Exception e) {
                 Log.e(TAG, "printBitmap failed", e);
                 mainHandler.post(() -> {
-                    if (callback != null) callback.onError(e.getMessage());
+                    if (callback != null) {
+                        callback.onError(e.getMessage() != null ? e.getMessage() : "Print failed");
+                    }
                 });
             }
         });
@@ -133,10 +214,23 @@ public class BluetoothPrinterHelper implements IPrinter {
 
     private void closeQuietly() {
         isConnected = false;
-        try { if (outputStream != null) outputStream.close(); } catch (IOException ignored) {}
-        try { if (socket != null) socket.close(); } catch (IOException ignored) {}
+        connectedMac = null;
+        try {
+            if (outputStream != null) outputStream.close();
+        } catch (IOException ignored) {
+        }
+        try {
+            if (socket != null) socket.close();
+        } catch (IOException ignored) {
+        }
         outputStream = null;
         socket = null;
+    }
+
+    private void notifyConnected(ConnectionCallback callback) {
+        mainHandler.post(() -> {
+            if (callback != null) callback.onConnected();
+        });
     }
 
     private void notifyFailed(ConnectionCallback callback, String error) {
