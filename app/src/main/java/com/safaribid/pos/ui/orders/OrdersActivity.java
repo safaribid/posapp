@@ -484,18 +484,38 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     }
 
     private boolean matchesFilter(Order order) {
+        if (order == null) return false;
+
         int status = order.getStatus();
+        Integer deliveryStatus = DeliveryProgressStore.get().getByShopOrderId(order.getId());
+        boolean isDelivered = status == 8
+                || (deliveryStatus != null && deliveryStatus == 8);
+        boolean isRejected = status == 11;
+
         switch (currentFilter) {
             case "new":
                 return status == 2;
+
             case "active":
+                // In progress for the shop, but not finished delivery
+                if (isDelivered || isRejected) return false;
                 return status >= 3 && status <= 7;
+
             case "completed":
-                return status == 8; // or status == 8 || status == 9 || status == 10
+                // UI label is "Delivered"
+                return isDelivered;
+
             case "all":
             default:
                 return true;
         }
+    }
+
+    private static boolean isDeliveredOrder(Order order) {
+        if (order == null) return false;
+        if (order.getStatus() == 8) return true;
+        Integer ds = DeliveryProgressStore.get().getByShopOrderId(order.getId());
+        return ds != null && ds == 8;
     }
 
     private boolean matchesSearch(Order order) {

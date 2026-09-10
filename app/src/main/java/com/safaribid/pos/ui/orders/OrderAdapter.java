@@ -111,11 +111,11 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             String statusLabel = DeliveryProgressStore.displayLabel(order);
             tvStatus.setText(statusLabel);
 
-            // New / unfulfilled orders → red style + Accept/Reject
             boolean isNewOrder = order.getStatus() == 2;
+            boolean isDelivered = order.getStatus() == 8
+                    || isDeliveryComplete(order);
 
             if (isNewOrder) {
-                // Highlight like the red order in the screenshot
                 cardOrder.setCardBackgroundColor(Color.parseColor("#FFEBEE"));
                 tvStatus.setBackgroundColor(Color.parseColor("#FFCDD2"));
                 tvStatus.setTextColor(Color.parseColor("#C62828"));
@@ -129,7 +129,22 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
                 btnReject.setOnClickListener(v -> {
                     if (listener != null) listener.onReject(order);
                 });
+
+            } else if (isDelivered) {
+                // Completed / delivered — green
+                cardOrder.setCardBackgroundColor(Color.parseColor("#E8F5E9"));
+                tvStatus.setBackgroundColor(Color.parseColor("#C8E6C9"));
+                tvStatus.setTextColor(Color.parseColor("#2E7D32"));
+
+                layoutNewOrderActions.setVisibility(View.GONE);
+                btnPrimaryAction.setVisibility(View.VISIBLE);
+                btnPrimaryAction.setText("View Details");
+                btnPrimaryAction.setOnClickListener(v -> {
+                    if (listener != null) listener.onPrimaryAction(order);
+                });
+
             } else {
+                // Active — white
                 cardOrder.setCardBackgroundColor(Color.WHITE);
                 tvStatus.setBackgroundColor(Color.parseColor("#E3F2FD"));
                 tvStatus.setTextColor(Color.parseColor("#1565C0"));
@@ -145,6 +160,11 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
             itemView.setOnClickListener(v -> {
                 if (listener != null) listener.onOrderClick(order);
             });
+        }
+
+        private boolean isDeliveryComplete(Order order) {
+            Integer ds = DeliveryProgressStore.get().getByShopOrderId(order.getId());
+            return ds != null && ds == 8;
         }
 
         private String buildItemsSummary(Order order) {
