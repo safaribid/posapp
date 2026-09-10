@@ -136,13 +136,7 @@ public class OrderAdapter extends RecyclerView.Adapter<OrderAdapter.OrderViewHol
 
                 layoutNewOrderActions.setVisibility(View.GONE);
                 btnPrimaryAction.setVisibility(View.VISIBLE);
-
-                if (order.getStatus() == 3 || order.getStatus() == 4) {
-                    btnPrimaryAction.setText("Complete Fulfillment");
-                } else {
-                    btnPrimaryAction.setText("View Details");
-                }
-
+                btnPrimaryAction.setText("View Details");
                 btnPrimaryAction.setOnClickListener(v -> {
                     if (listener != null) listener.onPrimaryAction(order);
                 });

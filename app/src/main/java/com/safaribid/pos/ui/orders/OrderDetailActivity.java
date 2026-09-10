@@ -303,9 +303,25 @@ public class OrderDetailActivity extends AppCompatActivity {
     private void applyDeliveryProgressToUi() {
         if (currentOrder == null) return;
 
-        if (txtStatusChip != null) {
-            txtStatusChip.setText(DeliveryProgressStore.displayLabel(currentOrder).toUpperCase(Locale.getDefault()));
+        int orderStatus = currentOrder.getStatus();
+
+        // Delivery labels only once order is ready for pickup or later
+        boolean useDeliveryLabel = orderStatus >= 5
+                && lastDeliveryStatus != null
+                && lastDeliveryStatus >= 2
+                && lastDeliveryStatus <= 8;
+
+        if (useDeliveryLabel && txtStatusChip != null) {
+            txtStatusChip.setText(
+                    DeliveryProgressStore.labelFor(lastDeliveryStatus)
+                            .toUpperCase(Locale.getDefault())
+            );
+        } else if (txtStatusChip != null) {
+            txtStatusChip.setText(
+                    currentOrder.getStatusLabel().toUpperCase(Locale.getDefault())
+            );
         }
+
         updateActionButtons();
     }
 

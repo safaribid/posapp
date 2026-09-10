@@ -61,14 +61,20 @@ public final class DeliveryProgressStore {
         }
     }
 
-    /** Chip text: delivery progress if active, else shop order label. */
+    /** Chip text: delivery progress only after order is Ready for Pickup+. */
     public static String displayLabel(Order order) {
         if (order == null) return "—";
-        Integer ds = get().getByShopOrderId(order.getId());
-        // status 2 = searching, 3-8 = progress
-        if (ds != null && ds >= 2) {
-            return labelFor(ds);
+
+        int orderStatus = order.getStatus();
+
+        // Delivery UI only after Mark Ready / Request Driver phase
+        if (orderStatus >= 5 && orderStatus <= 8) {
+            Integer ds = get().getByShopOrderId(order.getId());
+            if (ds != null && ds >= 2 && ds <= 8) {
+                return labelFor(ds);
+            }
         }
+
         return order.getStatusLabel();
     }
 }
