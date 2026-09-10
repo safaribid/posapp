@@ -308,32 +308,16 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
 
         txtTrackingCode.setText(trackingCode != null ? trackingCode : "—");
 
-        // PICKUP: name = shop; subtitle only if we have a real street field
-        AddressInfo pickup = d.getPickupAddress();
-        if (pickup != null) {
-            txtPickupName.setText(pickup.titleOrName());
-            // Prefer business street if API ever adds it; else show name only once
-            String sub = pickup.getAddress() != null ? pickup.displayLine() : "—";
-            // If displayLine() would repeat the shop name, keep subtitle as em dash
-            if (sub.equals(pickup.titleOrName())) {
-                txtPickupAddress.setText("—");
-            } else {
-                txtPickupAddress.setText(sub);
-            }
-        } else if (d.getBusiness() != null && d.getBusiness().getName() != null) {
-            txtPickupName.setText(d.getBusiness().getName());
-            txtPickupAddress.setText("—");
-        } else {
-            txtPickupName.setText("Pickup");
-            txtPickupAddress.setText("—");
-        }
+        // PICKUP: title = shop name; subtitle = business.address
+        txtPickupName.setText(d.pickupTitle());
+        txtPickupAddress.setText(d.pickupSubtitle());
 
-        // DROPOFF: name is the address text
+        // DROPOFF
         AddressInfo drop = d.getDropoffAddress();
         if (drop != null) {
-            txtDropoffAddress.setText(drop.displayLine()); // uses name
+            txtDropoffAddress.setText(drop.displayLine());
         } else {
-            txtDropoffAddress.setText("—");
+            txtDropoffAddress.setText(d.dropoffSubtitle());
         }
 
         txtDriverStatus.setText(d.driverStatusLabel());

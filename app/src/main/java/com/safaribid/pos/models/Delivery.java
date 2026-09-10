@@ -109,8 +109,22 @@ public class Delivery {
         return "Pickup";
     }
 
+    /** Street line under the shop name — prefer business.address */
     public String pickupSubtitle() {
-        return pickupAddress != null ? pickupAddress.displayLine() : "—";
+        if (business != null
+                && business.getAddress() != null
+                && !business.getAddress().trim().isEmpty()) {
+            return business.getAddress().trim();
+        }
+        // Fallback only if business.address missing
+        if (pickupAddress != null) {
+            String line = pickupAddress.displayLine();
+            String title = pickupTitle();
+            if (line != null && !line.equals("—") && !line.equalsIgnoreCase(title)) {
+                return line;
+            }
+        }
+        return "—";
     }
 
     public String dropoffSubtitle() {
