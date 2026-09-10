@@ -602,7 +602,7 @@ public class OrderDetailActivity extends AppCompatActivity {
                 btnPrimaryAction.setEnabled(true); // can press again until driver accepts
                 break;
             case 8:
-                btnPrimaryAction.setText("Completed");
+                btnPrimaryAction.setText("Delivered");
                 btnPrimaryAction.setEnabled(false);
                 break;
             case 9:

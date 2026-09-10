@@ -273,8 +273,8 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
         // rename unfulfilled → New Order
         btnFilterUnfulfilled.setText("New Order");
         btnFilterUnfulfilled.setOnClickListener(v -> setFilter("new"));
-        // rename partial → Completed
-        btnFilterPartial.setText("Completed");
+        // rename partial → Delivered
+        btnFilterPartial.setText("Delivered");
         btnFilterPartial.setOnClickListener(v -> setFilter("completed"));
     }
 
@@ -613,7 +613,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                 // Update list labels
                 applyDeliveryStatusToList(event);
 
-                // If completed, refresh everything
+                // If delivered, refresh everything
                 if (ds == 8) {
                     loadOrders();
                 }

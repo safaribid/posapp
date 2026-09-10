@@ -103,7 +103,7 @@ public class Order {
             case 5: return "Ready for Pickup";
             case 6: return "Driver on the way";
             case 7: return "Driver is here";
-            case 8: return "Completed";
+            case 8: return "Delivered";
             case 9:
             case 10:
                 // legacy / other — not vendor reject
