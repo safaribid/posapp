@@ -2,63 +2,48 @@ package com.safaribid.pos.models;
 
 import com.google.gson.annotations.SerializedName;
 
-/**
- * Socket event: "delivery_status"
- * Base fields from backend notifyDeliveryStatus + optional extras + timestamp.
- */
 public class DeliveryStatusEvent {
 
     @SerializedName("deliveryId")
     private String deliveryId;
 
-    private int status;
-
-    @SerializedName("shopOrderStatus")
-    private Integer shopOrderStatus;
-
-    @SerializedName("shop_order_id")
+    /** Preferred if backend adds it later */
+    @SerializedName(value = "shopOrderId", alternate = {"shop_order_id"})
     private String shopOrderId;
 
+    /** Current backend shape */
+    @SerializedName(value = "shopOrder", alternate = {"shop_order"})
+    private ShopOrderRef shopOrder;
+
+    private int status;
+
+    @SerializedName(value = "shopOrderStatus", alternate = {"shop_order_status"})
+    private Integer shopOrderStatus;
+
+    private String action;
     private String timestamp;
 
-    public String getDeliveryId() {
-        return deliveryId;
-    }
+    public String getDeliveryId() { return deliveryId; }
 
-    public void setDeliveryId(String deliveryId) {
-        this.deliveryId = deliveryId;
-    }
-
-    public int getStatus() {
-        return status;
-    }
-
-    public void setStatus(int status) {
-        this.status = status;
-    }
+    public int getStatus() { return status; }
 
     public Integer getShopOrderStatus() {
-        return shopOrderStatus;
+        if (shopOrderStatus != null) return shopOrderStatus;
+        if (shopOrder != null) return shopOrder.status;
+        return null;
     }
 
-    public void setShopOrderStatus(Integer shopOrderStatus) {
-        this.shopOrderStatus = shopOrderStatus;
-    }
+    public String getAction() { return action; }
 
-    public String getShopOrderId() {
-        return shopOrderId;
-    }
+    public String getTimestamp() { return timestamp; }
 
-    public void setShopOrderId(String shopOrderId) {
-        this.shopOrderId = shopOrderId;
-    }
-
-    public String getTimestamp() {
-        return timestamp;
-    }
-
-    public void setTimestamp(String timestamp) {
-        this.timestamp = timestamp;
+    /** Always use this — works for flat or nested payload */
+    public String resolveShopOrderId() {
+        if (shopOrderId != null && !shopOrderId.isEmpty()) return shopOrderId;
+        if (shopOrder != null && shopOrder.id != null && !shopOrder.id.isEmpty()) {
+            return shopOrder.id;
+        }
+        return null;
     }
 
     /** Human label for delivery progress (driver side). */
@@ -73,5 +58,10 @@ public class DeliveryStatusEvent {
             case 8: return "Delivered";
             default: return "Delivery status " + status;
         }
+    }
+
+    public static class ShopOrderRef {
+        public String id;
+        public Integer status;
     }
 }

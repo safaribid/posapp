@@ -590,21 +590,18 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                     return;
                 }
 
-                String shopOrderId = event.getShopOrderId();
+                String shopOrderId = event.resolveShopOrderId();
+                int ds = event.getStatus();
 
-                if (event.getDeliveryId() != null) {
-                    DeliveryProgressStore.get().put(
-                            shopOrderId,
-                            event.getDeliveryId(),
-                            event.getStatus()
-                    );
+                if (shopOrderId != null && ds >= 2 && ds <= 8) {
+                    DeliveryProgressStore.get().put(shopOrderId, event.getDeliveryId(), ds);
                 }
 
                 // UI feedback
                 String label = event.getStatusLabel();
                 Toast.makeText(this, label, Toast.LENGTH_SHORT).show();
 
-                if (event.getStatus() == 3 || event.getStatus() == 8) {
+                if (ds == 3 || ds == 8) {
                     playNotificationSound();
                 }
 
@@ -617,7 +614,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
                 applyDeliveryStatusToList(event);
 
                 // If completed, refresh everything
-                if (event.getStatus() == 8) {
+                if (ds == 8) {
                     loadOrders();
                 }
             } catch (Exception e) {
@@ -628,16 +625,12 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     }
 
     private void applyDeliveryStatusToList(DeliveryStatusEvent event) {
-        if (event.getDeliveryId() == null) return;
+        String shopOrderId = event.resolveShopOrderId();
+        int ds = event.getStatus();
 
-        // Update any order we already linked or can match by shopOrderId
-        String shopOrderId = event.getShopOrderId();
-        if (shopOrderId != null) {
-            DeliveryProgressStore.get().put(shopOrderId, event.getDeliveryId(), event.getStatus());
+        if (shopOrderId != null && ds >= 2 && ds <= 8) {
+            DeliveryProgressStore.get().put(shopOrderId, event.getDeliveryId(), ds);
         }
-
-        // If we only have deliveryId but no shopOrderId on the event, 
-        // heuristics could go here, but DeliveryStatusEvent usually has it.
 
         applyFilters(); // refreshes adapter labels via notifyDataSetChanged
     }

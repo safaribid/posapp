@@ -248,6 +248,7 @@ public class OrderDetailActivity extends AppCompatActivity {
             DeliveryStatusEvent event = gson.fromJson(payloadJson, DeliveryStatusEvent.class);
             if (event == null) return;
 
+            String shopOrderId = event.resolveShopOrderId();
             int ds = event.getStatus();
 
             // Driver rejected / cancelled search step — do NOT lock UI or show Rejected
@@ -257,18 +258,13 @@ public class OrderDetailActivity extends AppCompatActivity {
             }
 
             // Update shared store
-            if (currentOrder != null && event.getDeliveryId() != null) {
-                DeliveryProgressStore.get().put(
-                        currentOrder.getId(),
-                        event.getDeliveryId(),
-                        ds
-                );
-            } else if (event.getShopOrderId() != null) {
-                 DeliveryProgressStore.get().put(
-                        event.getShopOrderId(),
-                        event.getDeliveryId(),
-                        ds
-                );
+            if (shopOrderId != null && ds >= 2 && ds <= 8) {
+                DeliveryProgressStore.get().put(shopOrderId, event.getDeliveryId(), ds);
+            }
+
+            // Sync order status if provided
+            if (event.getShopOrderStatus() != null && shopOrderId != null) {
+                patchOrderStatus(shopOrderId, event.getShopOrderStatus());
             }
 
             // If we know deliveryId, ignore other deliveries
@@ -284,11 +280,6 @@ public class OrderDetailActivity extends AppCompatActivity {
             }
 
             lastDeliveryStatus = ds;
-
-            // Optional: keep shop order status in sync when backend sends it
-            if (event.getShopOrderStatus() != null && currentOrder != null) {
-                currentOrder.setStatus(event.getShopOrderStatus());
-            }
 
             // Always refresh chip + button from delivery progress
             applyDeliveryProgressToUi();
@@ -639,6 +630,13 @@ public class OrderDetailActivity extends AppCompatActivity {
                 break;
             default:
                 break;
+        }
+    }
+
+    private void patchOrderStatus(String orderId, int newStatus) {
+        if (currentOrder != null && orderId != null && orderId.equals(currentOrder.getId())) {
+            currentOrder.setStatus(newStatus);
+            runOnUiThread(() -> bindOrder(currentOrder));
         }
     }
 
