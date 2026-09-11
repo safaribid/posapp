@@ -7,6 +7,7 @@
     android:background="#F2F3F5">
 
     <com.google.android.material.appbar.AppBarLayout
+        android:id="@+id/appBarLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@android:color/white"
@@ -347,6 +348,7 @@
 
     <!-- Bottom actions: Primary status | Print | Track -->
     <LinearLayout
+        android:id="@+id/bottomActionBar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"

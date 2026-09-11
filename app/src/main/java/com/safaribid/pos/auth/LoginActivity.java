@@ -3,6 +3,7 @@ package com.safaribid.pos.auth;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
@@ -12,6 +13,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.ui.orders.OrdersActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.network.SocketManager;
@@ -19,7 +21,7 @@ import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONObject;
 
-public class LoginActivity extends AppCompatActivity {
+public class LoginActivity extends BaseActivity {
 
     private LinearLayout layoutChoices;
     private LinearLayout layoutEmailForm;
@@ -46,7 +48,7 @@ public class LoginActivity extends AppCompatActivity {
         @Override
         public void onSuccess(JSONObject userData) {
             setLoading(false);
-            android.util.Log.d("LoginActivity", "User Data: " + userData.toString());
+            Log.d("LoginActivity", "User Data: " + userData.toString());
             String name = userData.optString("fname", "User");
             Toast.makeText(LoginActivity.this, "Welcome back " + name, Toast.LENGTH_SHORT).show();
 
@@ -69,6 +71,7 @@ public class LoginActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+        applySystemBarInsets(findViewById(R.id.rootLayout), null);
 
         authManager = new AuthManager(this);
 

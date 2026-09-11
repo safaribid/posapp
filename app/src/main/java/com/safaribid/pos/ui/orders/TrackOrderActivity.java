@@ -28,6 +28,7 @@ import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
+import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.models.AddressInfo;
@@ -50,7 +51,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyCallback {
+public class TrackOrderActivity extends BaseActivity implements OnMapReadyCallback {
 
     public static final String EXTRA_TRACKING_CODE = "tracking_code";
     public static final String EXTRA_DELIVERY_ID = "delivery_id";
@@ -96,6 +97,7 @@ public class TrackOrderActivity extends AppCompatActivity implements OnMapReadyC
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_track_order);
+        applySystemBarInsets(findViewById(R.id.appBarLayout), null);
 
         authManager = new AuthManager(this);
 

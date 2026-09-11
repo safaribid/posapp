@@ -13,7 +13,7 @@ import com.safaribid.pos.auth.LoginActivity;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.ui.orders.OrdersActivity;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends BaseActivity {
 
     private TextView tvStatus;
     private Button btnOrders;
@@ -24,6 +24,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        applySystemBarInsets(findViewById(R.id.rootLayout), null);
 
         authManager = new AuthManager(this);
 

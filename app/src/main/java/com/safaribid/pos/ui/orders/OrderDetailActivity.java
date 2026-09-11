@@ -24,6 +24,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import com.google.gson.Gson;
+import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.models.Delivery;
@@ -55,7 +56,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class OrderDetailActivity extends AppCompatActivity {
+public class OrderDetailActivity extends BaseActivity {
 
     public static final String EXTRA_ORDER_ID = "order_id";
     public static final String EXTRA_ORDER_JSON = "order";
@@ -132,6 +133,7 @@ public class OrderDetailActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_detail);
+        applySystemBarInsets(findViewById(R.id.appBarLayout), findViewById(R.id.bottomActionBar));
 
         authManager = new AuthManager(this);
 

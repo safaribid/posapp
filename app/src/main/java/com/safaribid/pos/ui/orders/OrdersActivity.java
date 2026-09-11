@@ -31,6 +31,7 @@ import com.facebook.shimmer.ShimmerFrameLayout;
 import com.google.android.material.navigation.NavigationView;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.gson.Gson;
+import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.auth.LoginActivity;
@@ -58,7 +59,7 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
-public class OrdersActivity extends AppCompatActivity implements SocketManager.OrderListener {
+public class OrdersActivity extends BaseActivity implements SocketManager.OrderListener {
 
     private static final String TAG = "OrdersActivity";
 
@@ -84,6 +85,7 @@ public class OrdersActivity extends AppCompatActivity implements SocketManager.O
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_orders);
+        applySystemBarInsets(findViewById(R.id.appBarLayout), null);
 
         authManager = new AuthManager(this);
 
