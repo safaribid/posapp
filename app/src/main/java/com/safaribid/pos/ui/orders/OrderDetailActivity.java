@@ -22,6 +22,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 
 import com.google.gson.Gson;
 import com.safaribid.pos.BaseActivity;
@@ -133,6 +134,12 @@ public class OrderDetailActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_detail);
+
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_purple));
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                .setAppearanceLightStatusBars(false);
+
         applySystemBarInsets(findViewById(R.id.appBarLayout), findViewById(R.id.bottomActionBar));
 
         authManager = new AuthManager(this);

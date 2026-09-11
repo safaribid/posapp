@@ -12,6 +12,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowCompat;
 
 import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.ui.orders.OrdersActivity;
@@ -71,6 +73,12 @@ public class LoginActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
+
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_purple));
+        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
+                .setAppearanceLightStatusBars(false);
+
         applySystemBarInsets(findViewById(R.id.rootLayout), null);
 
         authManager = new AuthManager(this);

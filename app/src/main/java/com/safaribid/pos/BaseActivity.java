@@ -10,7 +10,7 @@ import androidx.core.view.WindowInsetsCompat;
 
 public abstract class BaseActivity extends AppCompatActivity {
     protected void applySystemBarInsets(View top, View bottom) {
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), false);
+        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
         if (top != null) {
             ViewCompat.setOnApplyWindowInsetsListener(top, (v, insets) -> {
                 Insets bars = insets.getInsets(WindowInsetsCompat.Type.statusBars());
