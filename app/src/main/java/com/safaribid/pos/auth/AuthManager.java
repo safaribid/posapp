@@ -1,11 +1,13 @@
 package com.safaribid.pos.auth;
 
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.utils.AppConfig;
 import com.google.firebase.messaging.FirebaseMessaging;
 
@@ -256,9 +258,11 @@ public class AuthManager {
 
                         mainHandler.post(() -> callback.onToken(accessToken));
                     } else {
-                        // Refresh failed → force logout
-                        logout();
-                        mainHandler.post(() -> callback.onError("Session expired. Please login again."));
+                        // Refresh failed → force logout and redirect
+                        mainHandler.post(() -> {
+                            logoutAndRedirectToLogin(context);
+                            callback.onError("Session expired. Please login again.");
+                        });
                     }
                 }
             } catch (Exception e) {
@@ -317,6 +321,19 @@ public class AuthManager {
 
     public void logout() {
         prefs.edit().clear().apply();
+    }
+
+    public void logoutAndRedirectToLogin(Context context) {
+        logout();
+        try {
+            SocketManager.getInstance().disconnect();
+        } catch (Exception ignored) {
+        }
+
+        Intent intent = new Intent(context, LoginActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
+        intent.putExtra("session_expired", true);
+        context.startActivity(intent);
     }
 
     public boolean isLoggedIn() {

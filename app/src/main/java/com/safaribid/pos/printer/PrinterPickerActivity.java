@@ -15,6 +15,8 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.safaribid.pos.auth.AuthManager;
+
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
@@ -43,11 +45,19 @@ public class PrinterPickerActivity extends AppCompatActivity {
     private Button btnRefresh;
     private ArrayAdapter<String> adapter;
     private final List<BluetoothDevice> devices = new ArrayList<>();
+    private AuthManager authManager;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_printer_picker);
+
+        authManager = new AuthManager(this);
+        if (!authManager.isLoggedIn()) {
+            authManager.logoutAndRedirectToLogin(this);
+            finish();
+            return;
+        }
 
         if (getSupportActionBar() != null) {
             getSupportActionBar().setTitle("Select printer");

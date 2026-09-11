@@ -144,6 +144,12 @@ public class OrderDetailActivity extends BaseActivity {
 
         authManager = new AuthManager(this);
 
+        if (!authManager.isLoggedIn()) {
+            authManager.logoutAndRedirectToLogin(this);
+            finish();
+            return;
+        }
+
         orderId = getIntent().getStringExtra(EXTRA_ORDER_ID);
         String orderJson = getIntent().getStringExtra(EXTRA_ORDER_JSON);
 
@@ -441,6 +447,20 @@ public class OrderDetailActivity extends BaseActivity {
                     orderId = currentOrder.getId();
                     afterOrderBound();
                 } else {
+                    if (response.code() == 401) {
+                        authManager.refreshAccessToken(new AuthManager.TokenCallback() {
+                            @Override
+                            public void onToken(String accessToken) {
+                                loadOrder(id);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                showLoading(false);
+                            }
+                        });
+                        return;
+                    }
                     Toast.makeText(OrderDetailActivity.this, "Failed to load order", Toast.LENGTH_LONG).show();
                 }
             }
@@ -704,6 +724,20 @@ public class OrderDetailActivity extends BaseActivity {
                     updateActionButtons();
                     Toast.makeText(OrderDetailActivity.this, "Status updated", Toast.LENGTH_SHORT).show();
                 } else {
+                    if (response.code() == 401) {
+                        authManager.refreshAccessToken(new AuthManager.TokenCallback() {
+                            @Override
+                            public void onToken(String accessToken) {
+                                updateOrderStatus(newStatus);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                showLoading(false);
+                            }
+                        });
+                        return;
+                    }
                     if (btnPrimaryAction != null) btnPrimaryAction.setEnabled(true);
                     updateActionButtons(); // restore correct enabled state
                     Toast.makeText(OrderDetailActivity.this,

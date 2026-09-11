@@ -109,6 +109,12 @@ public class TrackOrderActivity extends BaseActivity implements OnMapReadyCallba
 
         authManager = new AuthManager(this);
 
+        if (!authManager.isLoggedIn()) {
+            authManager.logoutAndRedirectToLogin(this);
+            finish();
+            return;
+        }
+
         trackingCode = getIntent().getStringExtra(EXTRA_TRACKING_CODE);
         deliveryId = getIntent().getStringExtra(EXTRA_DELIVERY_ID);
         shopOrderId = getIntent().getStringExtra(EXTRA_SHOP_ORDER_ID);
@@ -196,6 +202,20 @@ public class TrackOrderActivity extends BaseActivity implements OnMapReadyCallba
                                 && response.body().getData() != null) {
                             applyDelivery(response.body().getData());
                         } else {
+                            if (response.code() == 401) {
+                                authManager.refreshAccessToken(new AuthManager.TokenCallback() {
+                                    @Override
+                                    public void onToken(String accessToken) {
+                                        loadByTrackingCode(code);
+                                    }
+
+                                    @Override
+                                    public void onError(String message) {
+                                        showLoading(false);
+                                    }
+                                });
+                                return;
+                            }
                             Toast.makeText(TrackOrderActivity.this,
                                     "Track failed (" + response.code() + ")",
                                     Toast.LENGTH_LONG).show();

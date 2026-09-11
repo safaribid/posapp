@@ -29,7 +29,8 @@ public class MainActivity extends BaseActivity {
         authManager = new AuthManager(this);
 
         if (!authManager.isLoggedIn()) {
-            goToLogin();
+            authManager.logoutAndRedirectToLogin(this);
+            finish();
             return;
         }
 
@@ -62,16 +63,7 @@ public class MainActivity extends BaseActivity {
     }
 
     private void logout() {
-        SocketManager.getInstance().disconnect();
-        authManager.logout();
-        Toast.makeText(this, "Logged out successfully", Toast.LENGTH_SHORT).show();
-        goToLogin();
+        authManager.logoutAndRedirectToLogin(this);
     }
 
-    private void goToLogin() {
-        Intent intent = new Intent(MainActivity.this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
-    }
 }

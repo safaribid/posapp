@@ -81,6 +81,10 @@ public class LoginActivity extends BaseActivity {
 
         applySystemBarInsets(findViewById(R.id.rootLayout), null);
 
+        if (getIntent().getBooleanExtra("session_expired", false)) {
+            Toast.makeText(this, "Session expired. Please sign in again.", Toast.LENGTH_LONG).show();
+        }
+
         authManager = new AuthManager(this);
 
         if (authManager.isLoggedIn()) {

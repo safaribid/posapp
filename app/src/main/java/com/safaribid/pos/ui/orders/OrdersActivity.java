@@ -97,6 +97,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
         authManager = new AuthManager(this);
 
         if (!authManager.isLoggedIn()) {
+            authManager.logoutAndRedirectToLogin(this);
             finish();
             return;
         }
@@ -368,10 +369,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
                             public void onError(String message) {
                                 showLoading(false);
                                 swipeRefresh.setRefreshing(false);
-                                Toast.makeText(OrdersActivity.this,
-                                        "Session expired. Please login again.",
-                                        Toast.LENGTH_LONG).show();
-                                // Optional: go to login
+                                // logoutAndRedirectToLogin is handled inside AuthManager.refreshAccessToken failure
                             }
                         });
                         return;
@@ -456,9 +454,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
                                     @Override
                                     public void onError(String message) {
                                         swipeRefresh.setRefreshing(false);
-                                        Toast.makeText(OrdersActivity.this,
-                                                "Session expired. Please login again.",
-                                                Toast.LENGTH_LONG).show();
+                                        // logoutAndRedirectToLogin is handled inside AuthManager.refreshAccessToken failure
                                     }
                                 });
                                 return;
@@ -550,13 +546,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
 
 
     private void logout() {
-        SocketManager.getInstance().disconnect();
-        authManager.logout();
-        Toast.makeText(this, "Logged out", Toast.LENGTH_SHORT).show();
-        Intent intent = new Intent(this, LoginActivity.class);
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TASK);
-        startActivity(intent);
-        finish();
+        authManager.logoutAndRedirectToLogin(this);
     }
 
     @Override
