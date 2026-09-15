@@ -208,6 +208,53 @@ public class BluetoothPrinterHelper implements IPrinter {
         });
     }
 
+    /**
+     * Preferred path for many built-in POS printers — plain ESC/POS text.
+     */
+    @Override
+    public void printText(byte[] payload, PrintCallback callback) {
+        if (!isConnected()) {
+            mainHandler.post(() -> {
+                if (callback != null) callback.onError("Printer not connected");
+            });
+            return;
+        }
+        if (payload == null || payload.length == 0) {
+            mainHandler.post(() -> {
+                if (callback != null) callback.onError("Nothing to print");
+            });
+            return;
+        }
+
+        executor.execute(() -> {
+            try {
+                // Chunk writes — some heads drop large single writes
+                final int CHUNK = 256;
+                int off = 0;
+                while (off < payload.length) {
+                    int len = Math.min(CHUNK, payload.length - off);
+                    outputStream.write(payload, off, len);
+                    outputStream.flush();
+                    off += len;
+                    try {
+                        Thread.sleep(20);
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onSuccess();
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "printText failed", e);
+                mainHandler.post(() -> {
+                    if (callback != null) {
+                        callback.onError(e.getMessage() != null ? e.getMessage() : "Print failed");
+                    }
+                });
+            }
+        });
+    }
+
     private void write(byte[] data) throws IOException {
         if (outputStream == null) throw new IOException("OutputStream is null");
         outputStream.write(data);

@@ -121,6 +121,11 @@ public class Sm1PrinterHelper implements IPrinter {
         }
     }
 
+    @Override
+    public void printText(byte[] payload, PrintCallback callback) {
+        if (callback != null) callback.onError("Text printing not implemented for SM1");
+    }
+
     private void bind() {
         try {
             Intent intent = new Intent();

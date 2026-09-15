@@ -13,6 +13,7 @@ import android.util.Log;
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
 
+import java.io.ByteArrayOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
@@ -178,10 +179,64 @@ public class ReceiptBuilder {
         }
 
         Log.d("Print", "w=" + bitmap.getWidth() + " h=" + bitmap.getHeight());
-        int p = bitmap.getPixel(bitmap.getWidth() / 2, Math.min(40, bitmap.getHeight() - 1));
-        Log.d("Print", "sample pixel=" + Integer.toHexString(p));
-
         return bitmap;
+    }
+
+    /** ESC/POS text receipt — use this when bitmap prints blank */
+    public byte[] buildEscPos() {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try {
+            out.write(EscPosCommands.INIT);
+            out.write(EscPosCommands.CHARSET_PC437);
+            out.write(EscPosCommands.ALIGN_CENTER);
+            out.write(EscPosCommands.BOLD_ON);
+            out.write(EscPosCommands.textLine(shopName));
+            out.write(EscPosCommands.BOLD_OFF);
+            if (shopAddress != null && !shopAddress.isEmpty()) {
+                out.write(EscPosCommands.textLine(shopAddress));
+            }
+            if (shopPhone != null && !shopPhone.isEmpty()) {
+                out.write(EscPosCommands.textLine(shopPhone));
+            }
+            out.write(EscPosCommands.textLine("--------------------------------"));
+            out.write(EscPosCommands.ALIGN_LEFT);
+            out.write(EscPosCommands.textLine("Order #" + safe(order.getId())));
+            out.write(EscPosCommands.textLine(order.getStatusLabel()));
+            out.write(EscPosCommands.textLine(formatDate(order.getCreatedAt())));
+            out.write(EscPosCommands.textLine("Customer: " + order.getCustomerDisplayName()));
+            String phone = getPhone(order);
+            if (!"-".equals(phone)) {
+                out.write(EscPosCommands.textLine("Phone: " + phone));
+            }
+            out.write(EscPosCommands.textLine("--------------------------------"));
+            if (order.getItems() != null) {
+                for (OrderItem item : order.getItems()) {
+                    String title = item.getProductTitle();
+                    int qty = item.getQuantity();
+                    double price = item.getPrice();
+                    out.write(EscPosCommands.textLine(
+                            qty + " x " + title));
+                    out.write(EscPosCommands.textLine(
+                            String.format(Locale.US, "    KES %.2f", price * qty)));
+                }
+            }
+            out.write(EscPosCommands.textLine("--------------------------------"));
+            out.write(EscPosCommands.BOLD_ON);
+            out.write(EscPosCommands.textLine(
+                    String.format(Locale.US, "TOTAL  KES %.2f", order.getTotalPrice())));
+            out.write(EscPosCommands.BOLD_OFF);
+            if (order.getPaymentMethod() != null) {
+                out.write(EscPosCommands.textLine("Pay: " + order.getPaymentMethod()));
+            }
+            out.write(EscPosCommands.ALIGN_CENTER);
+            out.write(EscPosCommands.textLine(""));
+            out.write(EscPosCommands.textLine(footer));
+            out.write(EscPosCommands.feed(4));
+            out.write(EscPosCommands.PARTIAL_CUT);
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+        return out.toByteArray();
     }
 
     // ------------------------------------------------------------------

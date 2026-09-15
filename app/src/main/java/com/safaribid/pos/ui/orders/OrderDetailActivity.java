@@ -40,6 +40,7 @@ import com.safaribid.pos.models.TrackDeliveryResponse;
 import com.safaribid.pos.network.ApiClient;
 import com.safaribid.pos.network.ApiService;
 import com.safaribid.pos.network.SocketManager;
+import com.safaribid.pos.printer.BluetoothPrinterHelper;
 import com.safaribid.pos.printer.IPrinter;
 import com.safaribid.pos.printer.PrinterFactory;
 import com.safaribid.pos.printer.PrinterPickerActivity;
@@ -806,28 +807,48 @@ public class OrderDetailActivity extends BaseActivity {
 
     private void doPrintReceipt() {
         try {
-            Bitmap receiptBitmap = new ReceiptBuilder(currentOrder)
+            ReceiptBuilder builder = new ReceiptBuilder(currentOrder)
                     .setShopName(AppConfig.SHOP_NAME)
                     .setShopAddress(AppConfig.SHOP_ADDRESS)
                     .setShopPhone(AppConfig.SHOP_PHONE)
-                    .setFooter("Thank you for ordering with SafariBid!")
-                    .buildBitmap();
+                    .setFooter("Thank you for ordering with SafariBid!");
 
-            printer.printBitmap(receiptBitmap, new IPrinter.PrintCallback() {
-                @Override
-                public void onSuccess() {
-                    Toast.makeText(OrderDetailActivity.this,
-                            "Receipt printed", Toast.LENGTH_SHORT).show();
-                    printer.disconnect();
-                }
+            if (printer instanceof BluetoothPrinterHelper) {
+                byte[] data = builder.buildEscPos();
+                printer.printText(data, new IPrinter.PrintCallback() {
+                    @Override
+                    public void onSuccess() {
+                        Toast.makeText(OrderDetailActivity.this,
+                                "Receipt printed", Toast.LENGTH_SHORT).show();
+                        printer.disconnect();
+                    }
 
-                @Override
-                public void onError(String message) {
-                    Toast.makeText(OrderDetailActivity.this,
-                            "Print error: " + message, Toast.LENGTH_LONG).show();
-                    printer.disconnect();
-                }
-            });
+                    @Override
+                    public void onError(String message) {
+                        Toast.makeText(OrderDetailActivity.this,
+                                "Print error: " + message, Toast.LENGTH_LONG).show();
+                        printer.disconnect();
+                    }
+                });
+            } else {
+                Bitmap receiptBitmap = builder.buildBitmap();
+
+                printer.printBitmap(receiptBitmap, new IPrinter.PrintCallback() {
+                    @Override
+                    public void onSuccess() {
+                        Toast.makeText(OrderDetailActivity.this,
+                                "Receipt printed", Toast.LENGTH_SHORT).show();
+                        printer.disconnect();
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        Toast.makeText(OrderDetailActivity.this,
+                                "Print error: " + message, Toast.LENGTH_LONG).show();
+                        printer.disconnect();
+                    }
+                });
+            }
         } catch (Exception e) {
             Toast.makeText(this, "Print prepare failed: " + e.getMessage(),
                     Toast.LENGTH_LONG).show();

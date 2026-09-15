@@ -26,4 +26,6 @@ public interface IPrinter {
     void disconnect();
 
     void printBitmap(Bitmap bitmap, PrintCallback callback);
+
+    void printText(byte[] payload, PrintCallback callback);
 }

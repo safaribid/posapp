@@ -1,5 +1,7 @@
 package com.safaribid.pos.printer;
 
+import java.nio.charset.Charset;
+
 public final class EscPosCommands {
 
     private EscPosCommands() {
@@ -28,5 +30,19 @@ public final class EscPosCommands {
                 (byte) (height % 256),
                 (byte) (height / 256)
         };
+    }
+
+    /** Code page / charset — many Kenyan POS units accept this */
+    public static final byte[] CHARSET_PC437 = {0x1B, 0x74, 0x00};
+
+    public static byte[] text(String s) {
+        if (s == null) s = "";
+        // Prefer CP437/ISO-8859-1 style single-byte for cheap thermal heads
+        return s.getBytes(Charset.forName("ISO-8859-1"));
+    }
+
+    public static byte[] textLine(String s) {
+        String line = (s == null ? "" : s) + "\n";
+        return line.getBytes(Charset.forName("ISO-8859-1"));
     }
 }
