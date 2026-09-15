@@ -176,28 +176,12 @@ public class BluetoothPrinterHelper implements IPrinter {
 
         executor.execute(() -> {
             try {
-                // Fix 2: Quick hardware test (solid black bar)
-                try {
-                    Bitmap testBar = PrintUtil.solidBlackBar(384, 40);
-                    byte[] testBarData = PrintUtil.getBitmapData(testBar, false);
-                    int testWidthBytes = PrintUtil.getPaddingBitWidth(384) / 8;
-                    write(EscPosCommands.ALIGN_CENTER);
-                    write(EscPosCommands.rasterHeader(testWidthBytes, 40));
-                    write(testBarData);
-                    write("\n".getBytes());
-                } catch (Exception te) {
-                    Log.e(TAG, "Hardware test bar failed", te);
-                }
+                // true = invert bits (try when paper comes out blank)
+                byte[] imageData = PrintUtil.getBitmapData(bitmap, true);
 
-                byte[] imageData = PrintUtil.getBitmapData(bitmap);
                 int widthBytes = PrintUtil.getPaddingBitWidth(
                         Math.min(bitmap.getWidth(), PrintUtil.MAX_BIT_WIDTH)) / 8;
                 int height = bitmap.getHeight();
-
-                // Fix 4: Raster header must match data size
-                Log.d(TAG, "wBytes=" + widthBytes + " h=" + height
-                        + " data=" + imageData.length
-                        + " expected=" + (widthBytes * height));
 
                 write(EscPosCommands.ALIGN_CENTER);
                 write(EscPosCommands.rasterHeader(widthBytes, height));
