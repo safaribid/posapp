@@ -8,6 +8,7 @@ import android.graphics.Typeface;
 import android.text.Layout;
 import android.text.StaticLayout;
 import android.text.TextPaint;
+import android.util.Log;
 
 import com.safaribid.pos.models.Order;
 import com.safaribid.pos.models.OrderItem;
@@ -175,6 +176,10 @@ public class ReceiptBuilder {
         if (!footer.isEmpty()) {
             drawCentered(canvas, footer, smallPaint, contentWidth, y);
         }
+
+        Log.d("Print", "w=" + bitmap.getWidth() + " h=" + bitmap.getHeight());
+        int p = bitmap.getPixel(bitmap.getWidth() / 2, Math.min(40, bitmap.getHeight() - 1));
+        Log.d("Print", "sample pixel=" + Integer.toHexString(p));
 
         return bitmap;
     }
