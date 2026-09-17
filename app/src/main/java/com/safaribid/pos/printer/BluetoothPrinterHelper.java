@@ -186,7 +186,7 @@ public class BluetoothPrinterHelper implements IPrinter {
                 write(EscPosCommands.ALIGN_CENTER);
                 write(EscPosCommands.rasterHeader(widthBytes, height));
                 write(imageData);
-                write("\n\n".getBytes());
+                write(EscPosCommands.feed(6));
                 write(EscPosCommands.PARTIAL_CUT);
 
                 // Remember successful printer on this device

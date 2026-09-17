@@ -122,7 +122,7 @@ public class ReceiptBuilder {
             y += measureText(footer, smallPaint, contentWidth) + 8;
         }
 
-        y += PADDING + 20; // bottom margin
+        y += PADDING + 60; // was + 20
 
         int height = Math.max(y, 200);
 
@@ -231,7 +231,8 @@ public class ReceiptBuilder {
             out.write(EscPosCommands.ALIGN_CENTER);
             out.write(EscPosCommands.textLine(""));
             out.write(EscPosCommands.textLine(footer));
-            out.write(EscPosCommands.feed(4));
+            out.write(EscPosCommands.textLine(""));  // blank line
+            out.write(EscPosCommands.feed(8));       // more paper before cut (was 4)
             out.write(EscPosCommands.PARTIAL_CUT);
         } catch (Exception e) {
             throw new RuntimeException(e);
