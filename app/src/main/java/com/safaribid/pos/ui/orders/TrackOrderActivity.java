@@ -101,7 +101,7 @@ public class TrackOrderActivity extends BaseActivity implements OnMapReadyCallba
         setContentView(R.layout.activity_track_order);
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_purple));
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
                 .setAppearanceLightStatusBars(false);
 

@@ -88,7 +88,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
         setContentView(R.layout.activity_orders);
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_purple));
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
                 .setAppearanceLightStatusBars(false);
 

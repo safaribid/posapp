@@ -75,7 +75,7 @@ public class LoginActivity extends BaseActivity {
         setContentView(R.layout.activity_login);
 
         WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_purple));
+        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
         WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
                 .setAppearanceLightStatusBars(false);
 

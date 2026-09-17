@@ -60,7 +60,7 @@
                     android:background="?attr/selectableItemBackgroundBorderless"
                     android:contentDescription="Notifications"
                     android:src="@android:drawable/ic_popup_reminder"
-                    app:tint="#FFBB86FC" />
+                    app:tint="@color/brand_green" />
             </RelativeLayout>
 
             <com.google.android.material.textfield.TextInputLayout
