@@ -25,17 +25,24 @@
         android:theme="@style/Theme.Pos_app"
         tools:targetApi="31">
 
-        <!-- Login Screen (Launcher) -->
+        <!-- Splash (LAUNCHER) -->
         <activity
-            android:name=".auth.LoginActivity"
+            android:name=".SplashActivity"
             android:exported="true"
             android:screenOrientation="portrait"
-            android:windowSoftInputMode="adjustResize">
+            android:theme="@style/Theme.Pos_app.Splash">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Login Screen (no LAUNCHER) -->
+        <activity
+            android:name=".auth.LoginActivity"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:windowSoftInputMode="adjustResize" />
 
         <!-- Main Screen -->
         <activity
