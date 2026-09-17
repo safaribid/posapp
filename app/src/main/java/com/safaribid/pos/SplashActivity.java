@@ -18,7 +18,7 @@ import com.safaribid.pos.ui.orders.OrdersActivity;
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends AppCompatActivity {
 
-    private static final long SPLASH_MS = 1200L;
+    private static final long SPLASH_MS = 1500L;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
