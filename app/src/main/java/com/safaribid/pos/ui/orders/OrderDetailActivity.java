@@ -47,6 +47,7 @@ import com.safaribid.pos.printer.PrinterPickerActivity;
 import com.safaribid.pos.printer.PrinterPrefs;
 import com.safaribid.pos.printer.ReceiptBuilder;
 import com.safaribid.pos.utils.AppConfig;
+import com.safaribid.pos.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -136,12 +137,7 @@ public class OrderDetailActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_order_detail);
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightStatusBars(false);
-
-        applySystemBarInsets(findViewById(R.id.appBarLayout), findViewById(R.id.bottomActionBar));
+        UiUtils.applyNonEdgeToEdge(this);
 
         authManager = new AuthManager(this);
 

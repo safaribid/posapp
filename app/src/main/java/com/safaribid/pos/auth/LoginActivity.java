@@ -19,6 +19,7 @@ import com.safaribid.pos.BaseActivity;
 import com.safaribid.pos.ui.orders.OrdersActivity;
 import com.safaribid.pos.R;
 import com.safaribid.pos.network.SocketManager;
+import com.safaribid.pos.utils.UiUtils;
 import com.google.android.material.textfield.TextInputEditText;
 
 import org.json.JSONObject;
@@ -74,12 +75,7 @@ public class LoginActivity extends BaseActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_login);
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightStatusBars(false);
-
-        applySystemBarInsets(findViewById(R.id.rootLayout), null);
+        UiUtils.applyNonEdgeToEdge(this);
 
         if (getIntent().getBooleanExtra("session_expired", false)) {
             Toast.makeText(this, "Session expired. Please sign in again.", Toast.LENGTH_LONG).show();

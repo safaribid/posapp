@@ -14,6 +14,7 @@ import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.auth.LoginActivity;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.ui.orders.OrdersActivity;
+import com.safaribid.pos.utils.UiUtils;
 
 @SuppressLint("CustomSplashScreen")
 public class SplashActivity extends AppCompatActivity {
@@ -25,11 +26,7 @@ public class SplashActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
-        getWindow().setNavigationBarColor(ContextCompat.getColor(this, R.color.brand_green));
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightStatusBars(false);
+        UiUtils.applyNonEdgeToEdge(this);
 
         new Handler(Looper.getMainLooper()).postDelayed(this::goNext, SPLASH_MS);
     }

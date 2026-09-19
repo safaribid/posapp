@@ -12,6 +12,7 @@ import com.safaribid.pos.auth.AuthManager;
 import com.safaribid.pos.auth.LoginActivity;
 import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.ui.orders.OrdersActivity;
+import com.safaribid.pos.utils.UiUtils;
 
 public class MainActivity extends BaseActivity {
 
@@ -24,7 +25,7 @@ public class MainActivity extends BaseActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
-        applySystemBarInsets(findViewById(R.id.rootLayout), null);
+        UiUtils.applyNonEdgeToEdge(this);
 
         authManager = new AuthManager(this);
 

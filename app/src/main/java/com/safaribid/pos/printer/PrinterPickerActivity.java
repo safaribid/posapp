@@ -16,6 +16,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.safaribid.pos.auth.AuthManager;
+import com.safaribid.pos.utils.UiUtils;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -51,6 +52,8 @@ public class PrinterPickerActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_printer_picker);
+
+        UiUtils.applyNonEdgeToEdge(this);
 
         authManager = new AuthManager(this);
         if (!authManager.isLoggedIn()) {

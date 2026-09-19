@@ -49,6 +49,7 @@ import com.safaribid.pos.network.SocketManager;
 import com.safaribid.pos.notifications.NotificationHelper;
 import com.safaribid.pos.printer.PrinterPickerActivity;
 import com.safaribid.pos.utils.AppConfig;
+import com.safaribid.pos.utils.UiUtils;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -87,12 +88,7 @@ public class OrdersActivity extends BaseActivity implements SocketManager.OrderL
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_orders);
 
-        WindowCompat.setDecorFitsSystemWindows(getWindow(), true);
-        getWindow().setStatusBarColor(ContextCompat.getColor(this, R.color.brand_green));
-        WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView())
-                .setAppearanceLightStatusBars(false);
-
-        applySystemBarInsets(findViewById(R.id.appBarLayout), null);
+        UiUtils.applyNonEdgeToEdge(this);
 
         authManager = new AuthManager(this);
 
